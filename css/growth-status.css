@@ -1,0 +1,32 @@
+/**
+ * Growth status fills — exact palette (black text on all tiers).
+ */
+.status-severe {
+    background-color: #ff0000 !important;
+    color: #000000 !important;
+}
+
+.status-normal {
+    background-color: #00ff00 !important;
+    color: #000000 !important;
+}
+
+.status-moderate {
+    background-color: #ffff00 !important;
+    color: #000000 !important;
+}
+
+.status-over {
+    background-color: #ffc000 !important;
+    color: #000000 !important;
+}
+
+.status-oor {
+    background-color: #eef2f7 !important;
+    color: #000000 !important;
+}
+
+.status-na {
+    background-color: #fafcfd !important;
+    color: #000000 !important;
+}

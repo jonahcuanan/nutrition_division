@@ -1,0 +1,729 @@
+* {
+    font-family: Arial, sans-serif !important;
+}
+
+@media print {
+
+    html,
+    body {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        font-family: Arial, sans-serif !important;
+    }
+
+    body {
+        --print-body-font: 7.5pt;
+        --print-line-height: 1.0;
+        --print-title-font: 14.5pt;
+        /*I minus -2.5**/
+        --print-header-font: 8pt;
+        /*I minus it with -2**/
+        --print-note-font: 8.5pt;
+        /*I minus it with -1**/
+        --print-bar-font: 7.5pt;
+        /*exception I minus 1 b4 it was 8.5 now it is 7.5**/
+        --print-band-font: 12pt;
+        /*cotinue for -2**/
+        --print-tip-font: 8pt;
+        --print-meta-font: 6pt;
+        --print-table-font: 6.5pt;
+        --print-head-font: 6.5pt;
+        --print-subhead-font: 5.5pt;
+        --print-date-font: 8pt;
+        --print-th-note-font: 5pt;
+        --print-th-status-font: 6pt;
+        --print-pad-v: 0px;
+        --print-pad-h: 1px;
+        --print-grid-left: 100px;
+        --print-grid-right: 190px;
+        --print-grid-logo: 154px;
+        --print-logo-size: 0.7in;
+        background: #ffffff !important;
+        color: #000000;
+        font-family: Arial, sans-serif;
+        font-size: var(--print-body-font);
+        line-height: var(--print-line-height);
+        /* margin: 0;
+        padding: 0.1in 0.1in 0.1in 1.1in; for printing adjustment**/
+    }
+
+    aside#sidebar,
+    .sb-mobile-bar {
+        display: none !important;
+    }
+
+    main {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .no-print,
+    .screen-only {
+        display: none !important;
+    }
+
+    .print-only {
+        display: block !important;
+    }
+
+    .print-sheet {
+        font-family: Arial, sans-serif;
+        color: #000000;
+        width: 100%;
+    }
+
+    .print-top {
+        display: grid;
+        grid-template-columns: var(--print-grid-left) 1fr var(--print-grid-logo);
+        align-items: start;
+        column-gap: 6px;
+        font-size: var(--print-header-font);
+        margin-bottom: 1px;
+    }
+
+    .print-version {
+        width: auto;
+        font-weight: 400;
+        font-size: 8pt;
+        line-height: 1.05;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        margin-left: -2px;
+        gap: 0;
+    }
+
+    .print-date {
+        width: auto;
+        text-align: right;
+        font-weight: 700;
+    }
+
+    .print-read-first {
+        font-weight: 400;
+        font-size: 7pt;
+        text-decoration: underline !important;
+        color: #0c00ff !important;
+        margin-right: -30px !important;
+        margin-top: 10px;
+    }
+
+    .print-title-group {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 30px;
+        padding-right: 60px;
+        /* keep callout tight to the title */
+    }
+
+    .print-title {
+        flex: 1;
+        text-align: center;
+        font-size: var(--print-title-font);
+        font-weight: 700;
+        line-height: 1.05;
+        margin-top: 8px;
+        margin-left: 100px;
+    }
+
+    .print-title-right {
+        position: absolute;
+        right: 0;
+        top: 0;
+        transform: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 30px !important;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .print-date-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 40px;
+        margin-right: 0;
+        transform: translateX(60px);
+        margin-top: 13px;
+        font-size: 9pt;
+    }
+
+    .print-date-inline span {
+        font-weight: 400;
+    }
+
+    .print-date-inline span:last-child {
+        font-weight: 700;
+    }
+
+    .print-date-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .print-logo {
+        width: var(--print-logo-size);
+        height: var(--print-logo-size);
+        object-fit: contain;
+        justify-self: end;
+        margin-right: -6px;
+        /* tuck logo to header edge */
+    }
+
+    .print-note {
+        text-align: center;
+        font-size: var(--print-note-font);
+        margin-top: -80px;
+        margin-left: -70px;
+        flex: 1;
+        font: 200 var(--print-note-font) Arial, sans-serif;
+    }
+
+    .print-note-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: -5px;
+        margin-left: -6px;
+        /* pull bar to the header edge */
+    }
+
+    .print-bar {
+        font-size: var(--print-bar-font);
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        flex-shrink: 0;
+        transform: translateY(-28px);
+        width: 2.4in;
+        /* width for THIS TOOL IS FOR bar */
+    }
+
+    .print-label {
+        display: block;
+        width: 100%;
+        text-align: left;
+        font-size: 9pt;
+    }
+
+    .print-band {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        font-size: 11pt;
+        /*I minus it with -2**/
+        margin-top: -55px;
+        margin-right: 0;
+        column-gap: 12px;
+        font-weight: 550 !important;
+    }
+
+    .print-band-center {
+        justify-self: center;
+        text-align: center;
+        margin-right: -310px;
+    }
+
+    .print-band-right {
+        justify-self: start;
+        margin-right: 110px;
+        text-transform: none !important;
+
+    }
+
+    .print-tip {
+        font-size: var(--print-tip-font);
+        margin: 0 auto !important;
+        padding: 3px 4px !important;
+        display: block;
+        text-align: center !important;
+        width: 100%;
+    }
+
+    .print-tip+.print-tip {
+        margin-top: 0 !important;
+    }
+
+    .print-meta-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 160px;
+        align-items: center;
+        background-color: #d9d9d9 !important;
+        border: none !important;
+        height: 0.6in;
+        min-height: 0.6in;
+        padding: 0 40px;
+        /* Shifted to right with some breathing room */
+        margin: 0 !important;
+        font-family: Arial, sans-serif;
+        white-space: nowrap;
+    }
+
+    .print-meta-row .meta-barangay,
+    .print-meta-row .meta-city,
+    .print-meta-row .meta-province {
+        font-weight: 700;
+    }
+
+    .print-meta-row span {
+        font-size: 10pt;
+    }
+
+    /* Keep print blocks flush so the meta row touches the table with no colored gap */
+    .print-only {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .print-only+.print-only {
+        margin-top: -1px !important;
+        /* overlap by 1px to hide any seam */
+    }
+
+    .print-table {
+        margin-top: 0 !important;
+    }
+
+    .print-table {
+        font-size: var(--print-table-font);
+        border-collapse: collapse;
+        table-layout: fixed;
+        width: 100%;
+        max-width: 100%;
+        line-height: var(--print-line-height);
+        border: 2px solid #000000;
+        border-top: 0;
+        /* let meta band touch table without a dividing line */
+    }
+
+
+    .print-table tbody td {
+        font-size: var(--print-table-font);
+        font-weight: 400;
+        height: 0.4in;
+        min-height: 0.4in;
+    }
+
+    .print-table tbody td.print-status-cell {
+        font-weight: 700 !important;
+        font-size: 6.5pt !important;
+    }
+
+    .print-table tbody tr {
+        page-break-inside: avoid;
+    }
+
+    .print-table th,
+    .print-table td {
+        border: 1px solid #000000;
+        padding: var(--print-pad-v) var(--print-pad-h) !important;
+        word-break: break-word;
+        vertical-align: middle;
+        white-space: normal;
+    }
+
+    .print-table thead {
+        display: table-row-group;
+        /* avoid repeating header/colgroup on each printed page */
+    }
+
+    .print-table thead th {
+        font-size: var(--print-head-font);
+        text-transform: none;
+        height: 0.35in;
+        min-height: 0.35in;
+        line-height: 1.2;
+        /* tighter to shrink overall header height */
+        border-top: 1px solid #000000 !important;
+        /* keep top edge black */
+        border-left: 1px solid #ffffff !important;
+        /* white left edge */
+        border-right: 1px solid #ffffff !important;
+        /* white right edge */
+        border-bottom: 1px solid #000000 !important;
+    }
+
+    /* Force outer edges: first (Child Seq.) left border white, last (Weight for L/HT Status) right border white */
+    .print-table thead th:first-child {
+        border-left: 1px solid #ffffff !important;
+    }
+
+    .print-table thead th:last-child {
+        border-right: 1px solid #ffffff !important;
+    }
+
+    .print-left {
+        text-align: left;
+    }
+
+    .print-center {
+        text-align: center;
+    }
+
+    .print-h11 {
+        font-size: 9pt;
+        font-weight: 700;
+    }
+
+    .print-h10 {
+        font-size: 8pt;
+        font-weight: 700;
+    }
+
+    .print-subhead-lg {
+        font-size: 11pt;
+        font-weight: 700;
+    }
+
+    .print-subhead-md {
+        font-size: 10pt;
+        font-weight: 400;
+    }
+
+    .print-upper {
+        text-transform: uppercase;
+    }
+
+    .print-subhead {
+        display: block;
+        font-size: var(--print-subhead-font);
+        font-weight: 700;
+        text-transform: none;
+        margin-top: 2px;
+    }
+
+    .print-th-subnote {
+        display: block;
+        font-size: 6pt;
+        font-weight: 400;
+        line-height: 1.1;
+        margin-top: 1px;
+        text-transform: none;
+    }
+
+    .print-date-cell {
+        font-size: var(--print-date-font);
+        white-space: nowrap;
+    }
+
+    .print-status-cell {
+        font-weight: 700;
+        font-size: 6.5pt;
+        text-align: center;
+    }
+
+    .print-th-note {
+        font-weight: 700;
+        font-size: var(--print-th-note-font);
+        line-height: 1.0;
+        text-transform: none;
+    }
+
+    .print-th-status-note {
+        font-weight: 700;
+        font-size: var(--print-th-status-font);
+        line-height: 1.0;
+        text-transform: none;
+    }
+
+    .actions-col,
+    .actions-cell {
+        display: none !important;
+    }
+
+    .overflow-x-auto {
+        overflow: visible !important;
+    }
+
+    .shadow-sm {
+        box-shadow: none !important;
+    }
+
+    .rounded-xl {
+        border-radius: 0 !important;
+    }
+
+    .table-stack {
+        display: table !important;
+        width: 100% !important;
+    }
+
+    .table-stack thead {
+        display: table-header-group !important;
+    }
+
+    .table-stack tbody {
+        display: table-row-group !important;
+    }
+
+    .table-stack tr {
+        display: table-row !important;
+    }
+
+    .table-stack th,
+    .table-stack td {
+        display: table-cell !important;
+    }
+
+    .table-stack td::before {
+        content: none !important;
+    }
+
+    @page {
+        size: legal landscape;
+        margin: 0.5cm 0 0 0;
+    }
+
+    @page :first {
+        margin-top: 0;
+    }
+
+    /* Print color theme overrides */
+    .print-header-theme {
+        background-color: transparent !important;
+        border: none !important;
+        color: #000000 !important;
+    }
+
+    .print-header-theme .print-title {
+        color: #000000 !important;
+    }
+
+    .print-header-theme .print-version,
+    .print-header-theme .print-date,
+    .print-header-theme .print-note,
+    .print-header-theme .print-date-row span,
+    .print-header-theme .print-title-right {
+        color: #000000 !important;
+    }
+
+    .print-bar-theme {
+        background-color: transparent !important;
+        border: none !important;
+        color: #000000 !important;
+    }
+
+    .print-bar-theme .print-label {
+        background-color: #963634 !important;
+        color: #ffffff !important;
+    }
+
+    .print-bar-theme .print-barangay {
+        color: #000000 !important;
+        font-size: 11pt;
+        font-weight: 700;
+    }
+
+    .print-band-theme {
+        background-color: transparent !important;
+        border: none !important;
+        color: #000000 !important;
+        margin-bottom: -10px;
+    }
+
+    .print-tip {
+        background-color: #1E4D2B !important;
+        color: #F4C430 !important;
+    }
+
+    .print-tip.choose-barangay {
+        color: #ffffff !important;
+        padding-left: 10px !important;
+        font-size: 10px !important;
+    }
+
+    .zoom-tip {
+        font-size: 8.5pt !important;
+        padding-left: 5px !important;
+    }
+
+    .print-meta-theme {
+        border: none !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    .print-note-bg {
+        background-color: #963634 !important;
+        color: #ffffff !important;
+        text-decoration: underline !important;
+        white-space: nowrap !important;
+        font-size: var(--print-th-note-font) !important;
+        line-height: 1.5 !important;
+        padding: 2px 2px !important;
+    }
+
+    .age-months {
+        font-weight: 700 !important;
+    }
+
+    .print-status-note-bg {
+        background-color: #963634 !important;
+        color: #ffffff !important;
+        white-space: nowrap !important;
+        font-size: var(--print-th-status-font) !important;
+        line-height: 1.2 !important;
+        padding: 5px 2px !important;
+    }
+
+    .print-weight-height-bg {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+        line-height: 1.0 !important;
+        padding: 0 1px !important;
+    }
+
+    .print-age-weight-bg {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+    }
+
+    .print-nowrap {
+        white-space: nowrap !important;
+    }
+
+    .print-hide-barangay .print-barangay-col {
+        display: none !important;
+    }
+}
+
+@media screen {
+    .print-only {
+        display: none;
+    }
+}
+
+@media screen {
+    .child-table-wrap {
+        overflow-x: auto;
+    }
+
+    .child-table-wrap .table-stack {
+        display: table;
+        width: 100%;
+        min-width: 1100px;
+        border-collapse: collapse;
+    }
+
+    .child-table-wrap .table-stack thead {
+        display: table-header-group;
+    }
+
+    .child-table-wrap .table-stack tbody {
+        display: table-row-group;
+    }
+
+    .child-table-wrap .table-stack tr {
+        display: table-row;
+    }
+
+    .child-table-wrap .table-stack th,
+    .child-table-wrap .table-stack td {
+        display: table-cell;
+    }
+
+    .child-table-wrap .table-stack td::before {
+        content: none;
+    }
+}
+
+/* ===== RESPONSIVE DESIGN ===== */
+/* Tablet landscape (1024px - 1440px) */
+@media (max-width: 1440px) {
+    main {
+        padding: 28px 24px 60px !important;
+    }
+}
+
+/* Tablet (768px - 1023px) */
+@media (max-width: 1023px) {
+    main {
+        padding: 20px 16px 60px !important;
+    }
+}
+
+/* Mobile & Tablet transition (900px - 768px) */
+@media (max-width: 900px) {
+    main {
+        margin-left: 0 !important;
+        padding: 14px 12px 60px !important;
+    }
+}
+
+/* Mobile devices (480px - 768px) */
+@media (max-width: 768px) {
+    main {
+        padding: 10px 10px 80px !important;
+    }
+
+    .child-table-wrap {
+        overflow-x: auto;
+        border-radius: 6px;
+    }
+
+    .child-table-wrap .table-stack {
+        min-width: 600px;
+        font-size: 0.8rem;
+    }
+
+    .child-table-wrap .table-stack thead th {
+        padding: 8px 10px;
+        font-size: 0.65rem;
+    }
+
+    .child-table-wrap .table-stack tbody td {
+        padding: 8px 10px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Small mobile (up to 480px) */
+@media (max-width: 480px) {
+    main {
+        padding: 8px 8px 80px !important;
+        min-height: auto;
+    }
+
+    .child-table-wrap {
+        overflow-x: auto;
+        border-radius: 4px;
+    }
+
+    .child-table-wrap .table-stack {
+        min-width: 500px;
+        font-size: 0.75rem;
+    }
+
+    .child-table-wrap .table-stack thead th {
+        padding: 6px 8px;
+        font-size: 0.6rem;
+    }
+
+    .child-table-wrap .table-stack tbody td {
+        padding: 6px 8px;
+        font-size: 0.7rem;
+    }
+}
+
+/* Screen: keep table layout and allow horizontal scroll on small devices */
+.child-table-wrap {
+    overflow-x: auto;
+}
+
+.child-table-wrap .table-stack {
+    min-width: 1100px;
+    border-collapse: collapse;
+}
+
+
+/* Status colors: see css/growth-status.css (linked from child_profiles.php) */

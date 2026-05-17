@@ -1,0 +1,892 @@
+/* sidebar.css — NutriChild Navigation */
+
+:root {
+    --w-closed: 72px;
+    --w-open: 248px;
+
+    --green-900: #0f3d20;
+    --green-800: #14522a;
+    --green-700: #196633;
+    --green-600: #1e7a3c;
+
+    --yellow: #f0c000;
+    --yellow-dk: #c99f00;
+    --yellow-bg: #fef9e6;
+
+    --white: #ffffff;
+    --w08: rgba(255, 255, 255, 0.08);
+    --w14: rgba(255, 255, 255, 0.14);
+    --w28: rgba(255, 255, 255, 0.28);
+    --sep: rgba(255, 255, 255, 0.10);
+
+    --txt-hi: #eaf3ed;
+    --txt-mid: rgba(255, 255, 255, 0.55);
+    --txt-low: rgba(255, 255, 255, 0.28);
+    --txt-act: #0f3d20;
+    --txt-out: #ff9f9f;
+
+    --radius: 10px;
+    --speed: 0.26s;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ── Shell ─────────────────────────────── */
+aside#sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: var(--w-closed);
+    height: 100vh;
+    background: var(--green-800);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(0, 0, 0, 0.15);
+    overflow: visible;
+    transition: width var(--speed) var(--ease), transform var(--speed) var(--ease);
+    z-index: 1000;
+}
+
+/* Fix for "moving" on load: disable transitions initially */
+.sb-no-transition,
+.sb-no-transition *,
+.sb-no-transition~.main-content {
+    transition: none !important;
+}
+
+aside#sidebar.open {
+    width: var(--w-open);
+}
+
+.sb-inner {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Toggle arrow ───────────────────────── */
+#sbArrow {
+    position: absolute;
+    top: 68px;
+    right: -13px;
+    width: 26px;
+    height: 26px;
+    background: var(--yellow);
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1100;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.20);
+    transition: transform 0.15s;
+}
+
+#sbArrow:hover {
+    transform: scale(1.12);
+}
+
+#sbArrow svg {
+    width: 12px;
+    height: 12px;
+    stroke: var(--green-900);
+    fill: none;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform var(--speed) var(--ease);
+}
+
+aside#sidebar.open #sbArrow svg {
+    transform: rotate(180deg);
+}
+
+/* ── Brand ──────────────────────────────── */
+.sb-brand {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 18px 14px 16px;
+    border-bottom: 1px solid var(--sep);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.sb-logo {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    background: var(--yellow);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sb-logo svg {
+    width: 19px;
+    height: 19px;
+    stroke: var(--green-900);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sb-brand-text {
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: opacity var(--speed) var(--ease), transform var(--speed) var(--ease);
+    pointer-events: none;
+}
+
+aside#sidebar.open .sb-brand-text {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+}
+
+.sb-brand-name {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+}
+
+.sb-brand-tag {
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--yellow);
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    margin-top: 2px;
+}
+
+/* ── Nav scroll area ────────────────────── */
+aside nav {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0 10px;
+    gap: 1px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
+aside nav::-webkit-scrollbar {
+    width: 3px;
+}
+
+aside nav::-webkit-scrollbar-thumb {
+    background: var(--w08);
+    border-radius: 3px;
+}
+
+/* ── Section label ──────────────────────── */
+.sb-section {
+    font-family: Arial, sans-serif;
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--txt-low);
+    padding: 0 8px;
+    margin: 12px 0 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--speed) var(--ease), max-width var(--speed) var(--ease);
+}
+
+aside#sidebar.open .sb-section {
+    max-width: 220px;
+    opacity: 1;
+}
+
+/* ── Nav link (collapsed) ───────────────── */
+aside nav a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 48px;
+    padding: 0;
+    border-radius: var(--radius);
+    color: var(--txt-mid);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    position: relative;
+    transition: background 0.15s, color 0.15s;
+}
+
+/* ── Nav link (expanded) ────────────────── */
+aside#sidebar.open nav a {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 9px 10px;
+    height: auto;
+}
+
+/* ── Icon box ───────────────────────────── */
+.sb-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--w08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, transform 0.14s;
+}
+
+.sb-icon svg {
+    width: 15px;
+    height: 15px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* ── Tooltip (collapsed only) ──────────── */
+.sb-mini {
+    position: absolute;
+    left: calc(var(--w-closed) + 10px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-6px);
+    background: var(--green-900);
+    color: var(--white);
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 11px;
+    border-radius: 8px;
+    border: 1px solid var(--w14);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.14s, transform 0.14s;
+    z-index: 2000;
+}
+
+.sb-mini::before {
+    content: '';
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-right-color: var(--green-900);
+}
+
+aside:not(.open) nav a:hover .sb-mini,
+aside:not(.open) .sb-logout a:hover .sb-mini {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+aside#sidebar.open .sb-mini {
+    display: none;
+}
+
+/* ── Label ──────────────────────────────── */
+.sb-label {
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: inherit;
+    opacity: 0;
+    transform: translateX(-5px);
+    transition: opacity var(--speed) var(--ease), transform var(--speed) var(--ease);
+    letter-spacing: 0.01em;
+}
+
+aside#sidebar.open .sb-label {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* ── Hover ──────────────────────────────── */
+aside nav a:hover {
+    background: var(--w08);
+    color: var(--txt-hi);
+}
+
+aside nav a:hover .sb-icon {
+    background: var(--w14);
+    transform: scale(1.05);
+}
+
+/* ── Active — yellow ────────────────────── */
+aside nav a.active {
+    background: var(--yellow);
+    color: var(--txt-act);
+}
+
+aside nav a.active .sb-icon {
+    background: rgba(15, 61, 32, 0.10);
+}
+
+aside nav a.active:hover {
+    background: #e8b800;
+    color: var(--txt-act);
+}
+
+aside nav a.active .sb-label {
+    color: var(--txt-act);
+}
+
+/* Left accent strip on active */
+aside nav a.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20%;
+    height: 60%;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: rgba(15, 61, 32, 0.40);
+}
+
+/* ── Spacer ─────────────────────────────── */
+.sb-spacer {
+    flex: 1;
+    min-height: 8px;
+}
+
+/* ── Logout ─────────────────────────────── */
+.sb-logout-divider {
+    height: 1px;
+    background: var(--sep);
+    margin: 0 10px 8px;
+    flex-shrink: 0;
+}
+
+.sb-logout {
+    padding: 0 10px;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+    background: var(--green-800);
+}
+
+.sb-logout a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 48px;
+    padding: 0;
+    border-radius: var(--radius);
+    color: var(--txt-out);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    position: relative;
+    transition: background 0.15s, color 0.15s;
+}
+
+aside#sidebar.open .sb-logout a {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 9px 10px;
+    height: auto;
+}
+
+.sb-logout a:hover {
+    background: rgba(255, 80, 80, 0.10);
+    color: #ffd5d5;
+}
+
+.sb-logout a:hover .sb-icon {
+    transform: scale(1.05);
+}
+
+.sb-logout .sb-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 100, 100, 0.09);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, transform 0.14s;
+}
+
+.sb-logout .sb-icon svg {
+    width: 15px;
+    height: 15px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sb-logout .sb-label {
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: inherit;
+    opacity: 0;
+    transform: translateX(-5px);
+    transition: opacity var(--speed) var(--ease), transform var(--speed) var(--ease);
+}
+
+aside#sidebar.open .sb-logout .sb-label {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+aside#sidebar.open .sb-logout .sb-mini {
+    display: none;
+}
+
+/* ── Main content offset ────────────────── */
+.main-content {
+    margin-left: var(--w-closed);
+    transition: margin-left var(--speed) var(--ease);
+    padding: 2rem;
+}
+
+aside#sidebar.open~.main-content {
+    margin-left: var(--w-open);
+}
+
+/* ── Mobile bar + overlay ───────────────── */
+.sb-mobile-bar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--white);
+    border-bottom: 2px solid var(--yellow);
+    position: sticky;
+    top: 0;
+    z-index: 950;
+}
+
+.sb-mobile-toggle {
+    width: 38px;
+    height: 38px;
+    border: 1px solid #c9e6d4;
+    border-radius: 9px;
+    background: var(--white);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.sb-mobile-toggle svg {
+    width: 19px;
+    height: 19px;
+    stroke: var(--green-800);
+    stroke-width: 2.4;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sb-mobile-title {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--green-800);
+    letter-spacing: -0.01em;
+}
+
+#sbMobileOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.40);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.20s ease, visibility 0.20s ease;
+    z-index: 900;
+}
+
+#sbMobileOverlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+body.sb-lock {
+    overflow: hidden;
+}
+
+/* Mobile drawer close button */
+.sb-mobile-close {
+    display: none;
+    position: absolute;
+    top: 14px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--w14);
+    border-radius: 9px;
+    background: rgba(0, 0, 0, 0.12);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1101;
+    color: var(--white);
+    transition: background 0.15s;
+}
+
+.sb-mobile-close:hover {
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.sb-mobile-close svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+@media (max-width: 900px) {
+    #sbArrow {
+        display: none;
+    }
+
+    .sb-mobile-bar {
+        display: flex;
+    }
+
+    .sb-mobile-close {
+        display: inline-flex;
+    }
+
+    #sbMobileOverlay {
+        display: block;
+    }
+
+    aside#sidebar {
+        width: min(88vw, 300px);
+        height: 100dvh;
+        height: 100svh;
+        transform: translateX(-100%);
+        box-shadow: 8px 0 24px rgba(0, 0, 0, 0.20);
+    }
+
+    aside#sidebar.open {
+        width: min(88vw, 300px);
+        transform: translateX(0);
+    }
+
+    /* Drawer is an overlay — never push page content */
+    .main-content,
+    aside#sidebar.open~.main-content,
+    main.main-content {
+        margin-left: 0 !important;
+    }
+
+    aside#sidebar.open .sb-brand-text,
+    aside#sidebar.open .sb-label,
+    aside#sidebar.open .sb-section,
+    aside#sidebar.open .sb-logout .sb-label {
+        opacity: 1;
+        transform: translateX(0);
+        pointer-events: auto;
+        max-width: 220px;
+    }
+
+    aside#sidebar.open nav a,
+    aside#sidebar.open .sb-logout a {
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        padding: 9px 10px;
+        height: auto;
+    }
+
+    aside#sidebar.open .sb-mini {
+        display: none;
+    }
+
+    .sb-brand {
+        padding-right: 48px;
+    }
+
+    .sb-logout-divider {
+        margin-top: 4px;
+        flex-shrink: 0;
+    }
+
+    .sb-logout {
+        margin-bottom: 0;
+        padding: 10px 10px max(14px, env(safe-area-inset-bottom));
+        flex-shrink: 0;
+        position: sticky;
+        bottom: 0;
+        z-index: 6;
+        box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.12);
+    }
+}
+
+/* ── Responsive table ───────────────────── */
+@media (max-width: 768px) {
+    .table-stack {
+        display: block;
+        width: 100%;
+    }
+
+    .table-stack thead {
+        display: none;
+    }
+
+    .table-stack tbody {
+        display: block;
+    }
+
+    .table-stack tr {
+        display: block;
+        background: var(--white);
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin: 10px 0;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .table-stack td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 5px 0;
+        border: none;
+    }
+
+    .table-stack td::before {
+        content: attr(data-label);
+        font-family: Arial, sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding-right: 10px;
+    }
+
+    .table-stack td:not([data-label])::before,
+    .table-stack td[data-label=""]::before {
+        content: none;
+    }
+
+    .table-stack td[colspan] {
+        display: block;
+    }
+
+    .table-stack td[colspan]::before {
+        content: none;
+    }
+
+    .table-stack td.hidden {
+        display: none !important;
+    }
+
+    .table-stack .actions {
+        justify-content: flex-start;
+    }
+
+    .table-stack .qty-cell {
+        text-align: left;
+    }
+
+    .table-stack .stock-bar-wrap {
+        margin: 5px 0 0;
+    }
+}
+
+/* ==========================================================================
+   GLOBAL BUTTON OVERRIDES (Requested by User)
+   Based on barangay.php structure
+   Add: Teal (#1D9E75), View: Blue (#185FA5), Edit: Amber (#BA7517), 
+   Update: Dark blue (#0C447C), Delete: Red (#A32D2D)
+   ========================================================================== */
+
+/* 1. ADD BUTTONS (Teal #1D9E75) */
+.btn-add,
+.btn-primary,
+.btn-primary-green,
+.btn-primary-blue,
+.btn-green {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    padding: 11px 20px !important;
+    background: #1D9E75 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 14px !important;
+    font-family: 'Sora', sans-serif !important;
+    font-size: .84rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 12px rgba(29, 158, 117, .28) !important;
+    transition: background .18s, transform .18s, box-shadow .18s !important;
+    white-space: nowrap !important;
+    letter-spacing: -.01em !important;
+    text-decoration: none !important;
+}
+
+.btn-add:hover,
+.btn-primary:hover,
+.btn-primary-green:hover,
+.btn-primary-blue:hover,
+.btn-green:hover {
+    background: #15825f !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(29, 158, 117, .32) !important;
+}
+
+/* 2. UPDATE / SUBMIT BUTTONS (Dark Blue #0C447C) */
+.btn-submit,
+.btn-update,
+.btn-save {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    padding: 12px !important;
+    background: #0C447C !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 14px !important;
+    font-family: 'Sora', sans-serif !important;
+    font-size: .9rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    margin-top: 6px !important;
+    box-shadow: 0 4px 12px rgba(12, 68, 124, .24) !important;
+    transition: background .18s, transform .2s, box-shadow .18s !important;
+    letter-spacing: -.01em !important;
+    text-decoration: none !important;
+}
+
+.btn-submit:hover,
+.btn-update:hover,
+.btn-save:hover {
+    background: #09315c !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 20px rgba(12, 68, 124, .30) !important;
+}
+
+/* 3. TABLE ACTION BUTTONS: VIEW, EDIT, DELETE */
+/* Base Structure for all table action buttons */
+.btn-view,
+.btn-edit,
+.btn-delete,
+.tbl-btn-view,
+.tbl-btn-edit,
+.tbl-btn-delete,
+.btn-distribute,
+.btn-danger {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 6px 13px !important;
+    border: 1.5px solid transparent !important;
+    border-radius: 10px !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: .79rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: background .18s, border-color .18s, color .18s, transform .15s !important;
+    text-decoration: none !important;
+}
+
+/* 3a. VIEW BUTTONS (Blue #185FA5) */
+.btn-view,
+.tbl-btn-view,
+.btn-distribute {
+    background: #185FA5 !important;
+    color: #fff !important;
+    border-color: #185FA5 !important;
+}
+
+.btn-view:hover,
+.tbl-btn-view:hover,
+.btn-distribute:hover {
+    background: #124a82 !important;
+    color: #fff !important;
+    border-color: #124a82 !important;
+    transform: translateY(-1px) !important;
+}
+
+/* 3b. EDIT BUTTONS (Amber #BA7517) */
+.btn-edit,
+.tbl-btn-edit {
+    background: #BA7517 !important;
+    color: #fff !important;
+    border-color: #BA7517 !important;
+}
+
+.btn-edit:hover,
+.tbl-btn-edit:hover {
+    background: #965f12 !important;
+    color: #fff !important;
+    border-color: #965f12 !important;
+    transform: translateY(-1px) !important;
+}
+
+/* 3c. DELETE BUTTONS (Red #A32D2D) */
+.btn-delete,
+.tbl-btn-delete,
+.btn-danger {
+    background: #A32D2D !important;
+    color: #fff !important;
+    border-color: #A32D2D !important;
+    box-shadow: none !important;
+}
+
+.btn-delete:hover,
+.tbl-btn-delete:hover,
+.btn-danger:hover {
+    background: #802323 !important;
+    color: #fff !important;
+    border-color: #802323 !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Keep disabled state styling for delete buttons */
+.btn-delete.disabled,
+.tbl-btn-delete.disabled {
+    opacity: .38 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+}

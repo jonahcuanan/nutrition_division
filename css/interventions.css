@@ -1,0 +1,934 @@
+* {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+:root {
+    --green: #16a34a;
+    --green-dark: #15803d;
+    --green-light: #f0fdf4;
+    --green-mid: #dcfce7;
+    --green-border: #bbf7d0;
+    --blue: #2563eb;
+    --blue-dark: #1d4ed8;
+    --blue-light: #eff6ff;
+    --blue-border: #bfdbfe;
+    --red-light: #fff1f2;
+    --red-border: #fecdd3;
+    --red-text: #be123c;
+    --slate-50: #f8fafc;
+    --slate-100: #f1f5f9;
+    --slate-200: #e2e8f0;
+    --slate-300: #cbd5e1;
+    --slate-400: #94a3b8;
+    --slate-500: #64748b;
+    --slate-600: #475569;
+    --slate-700: #334155;
+    --slate-800: #1e293b;
+    --slate-900: #0f172a;
+}
+
+body {
+    background-color: #f1f5f9;
+    color: var(--slate-900);
+    font-size: 14px;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--slate-200);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--slate-500);
+    border-radius: 99px;
+    border: 2px solid var(--slate-200);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--slate-600);
+}
+
+/* ─── Flash / Error banners ─── */
+.banner-success {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--green-light);
+    border: 1px solid var(--green-border);
+    color: var(--green-dark);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.banner-success::before {
+    content: "✓";
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.banner-error {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--red-light);
+    border: 1px solid var(--red-border);
+    color: var(--red-text);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.banner-error::before {
+    content: "!";
+    font-weight: 700;
+    font-size: 15px;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--red-text);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-align: center;
+    line-height: 16px;
+}
+
+/* ─── Stat cards ─── */
+.stat-card {
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.stat-icon.green {
+    background: var(--green-light);
+}
+
+.stat-icon.blue {
+    background: var(--blue-light);
+}
+
+.stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--slate-500);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--slate-900);
+    line-height: 1.2;
+    margin-top: 2px;
+}
+
+/* ─── Buttons ─── */
+.btn-primary-green {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.btn-primary-green:hover {
+    background: var(--green-dark);
+}
+
+.btn-primary-blue {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.btn-primary-blue:hover {
+    background: var(--blue-dark);
+}
+
+.btn-ghost {
+    background: #fff;
+    color: var(--slate-700);
+    border: 1px solid var(--slate-200);
+    border-radius: 7px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.btn-ghost:hover {
+    background: var(--slate-50);
+}
+
+/* ─── Table ─── */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    border: 1px solid var(--slate-300);
+}
+
+.data-table thead tr {
+    background: var(--slate-900);
+}
+
+.data-table thead th {
+    color: #fff;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 11px 14px;
+    text-align: left;
+    border: 1px solid var(--slate-300);
+}
+
+.data-table thead th:first-child {
+    border-radius: 0;
+}
+
+.data-table thead th:last-child {
+    border-radius: 0;
+    text-align: center;
+}
+
+.data-table tbody tr {
+    transition: background .1s;
+}
+
+.data-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.data-table tbody td {
+    padding: 11px 14px;
+    color: var(--slate-700);
+    vertical-align: middle;
+    border: 1px solid var(--slate-300);
+}
+
+.data-table tbody td.type-cell {
+    font-weight: 700;
+    color: var(--slate-900);
+}
+
+.desc-cell {
+    color: var(--slate-600);
+    max-width: 200px;
+    line-height: 1.6;
+    white-space: pre-line;
+    word-break: break-word;
+    vertical-align: top;
+}
+
+.type-badge {
+    display: inline-flex;
+    align-items: center;
+    background: transparent;
+    color: var(--slate-900);
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.child-count-badge {
+    display: inline-flex;
+    align-items: center;
+    background: var(--blue-light);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.date-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--green-light);
+    color: var(--green-dark);
+    border: 1px solid var(--green-border);
+    border-radius: 6px;
+    padding: 3px 9px;
+    font-size: 12px;
+}
+
+/* action buttons in table (match barangay page sizing) */
+.tbl-btn-view,
+.tbl-btn-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 13px;
+    font-size: .79rem;
+    font-weight: 700;
+    border-radius: 10px;
+    border: 1.5px solid;
+    cursor: pointer;
+    transition: background .18s, border-color .18s, color .18s, transform .15s;
+    text-decoration: none;
+    line-height: 1;
+}
+
+.tbl-btn-view {
+    background: var(--green);
+    color: #fff;
+    border-color: var(--green);
+}
+
+.tbl-btn-view:hover {
+    background: var(--green-dark);
+    border-color: var(--green-dark);
+    transform: translateY(-1px);
+}
+
+.tbl-btn-edit {
+    background: var(--blue);
+    color: #fff;
+    border-color: var(--blue);
+}
+
+.tbl-btn-edit:hover {
+    background: var(--blue-dark);
+    border-color: var(--blue-dark);
+    transform: translateY(-1px);
+}
+
+/* ─── Search box ─── */
+.search-wrap {
+    position: relative;
+}
+
+.search-wrap svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--slate-400);
+    pointer-events: none;
+}
+
+.search-input {
+    width: 240px;
+    border: 1px solid var(--slate-200);
+    border-radius: 8px;
+    padding: 8px 12px 8px 34px;
+    font-size: 13px;
+    color: var(--slate-900);
+    background: #fff;
+    outline: none;
+    transition: border-color .15s;
+}
+
+.search-input:focus {
+    border-color: var(--green);
+}
+
+/* ─── Modals ─── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: rgba(15, 23, 42, .45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-box {
+    background: #fff;
+    border-radius: 14px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .18);
+    position: relative;
+    z-index: 3001;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--slate-100);
+}
+
+.modal-header-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.modal-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--slate-900);
+}
+
+.modal-sub {
+    font-size: 11px;
+    color: var(--slate-500);
+    margin-top: 1px;
+}
+
+.modal-close {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    border: 1px solid var(--slate-200);
+    background: #fff;
+    color: var(--slate-500);
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .12s;
+}
+
+.modal-close:hover {
+    background: var(--slate-100);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--slate-100);
+}
+
+/* ─── Form controls ─── */
+.field-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--slate-700);
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.field-input,
+.field-select,
+.field-textarea {
+    width: 100%;
+    border: 1px solid var(--slate-200);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--slate-900);
+    background: #fff;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    font-family: Arial, sans-serif;
+}
+
+.field-input:focus,
+.field-select:focus,
+.field-textarea:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, .12);
+}
+
+.field-textarea {
+    resize: vertical;
+}
+
+.giveout-wrap {
+    display: none;
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    background: #fff;
+    padding: 12px;
+}
+
+.giveout-wrap.active {
+    display: block;
+}
+
+.giveout-picker {
+    display: grid;
+    grid-template-columns: 1fr 1fr 100px 90px;
+    gap: 10px;
+    align-items: end;
+}
+
+.giveout-cart-empty {
+    text-align: center;
+    color: var(--slate-400);
+    font-size: 12px;
+    border: 1px dashed var(--slate-200);
+    border-radius: 8px;
+    padding: 14px 10px;
+}
+
+.giveout-cart-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--slate-200);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 10px;
+}
+
+.giveout-cart-table th,
+.giveout-cart-table td {
+    border-bottom: 1px solid var(--slate-100);
+    padding: 8px 10px;
+    font-size: 12px;
+}
+
+.giveout-cart-table th {
+    background: var(--slate-50);
+    color: var(--slate-600);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.giveout-remove-btn {
+    border: none;
+    background: transparent;
+    color: var(--red-text);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.giveout-error {
+    display: none;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--red-text);
+    background: var(--red-light);
+    border: 1px solid var(--red-border);
+    border-radius: 6px;
+    padding: 7px 10px;
+}
+
+/* ─── Children table (modal) ─── */
+.children-table-wrap {
+    max-height: 310px;
+    overflow: auto;
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    background: #fff;
+}
+
+.child-select-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    table-layout: fixed;
+    border: 1px solid var(--slate-200);
+}
+
+.child-select-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--slate-900);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    text-align: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, .12);
+    border-right: 1px solid rgba(255, 255, 255, .12);
+    white-space: normal;
+    line-height: 1.15;
+    vertical-align: bottom;
+}
+
+.child-select-table tbody td {
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--slate-300);
+    border-right: 1px solid var(--slate-300);
+    color: var(--slate-700);
+    vertical-align: top;
+    font-weight: 700;
+}
+
+.child-select-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.child-select-table tbody tr.is-hidden {
+    display: none;
+}
+
+.child-select-table tbody tr.is-selected {
+    background: #f0fdf4;
+}
+
+.child-profile-row {
+    cursor: pointer;
+    transition: background .14s ease, box-shadow .14s ease;
+}
+
+.child-check-row.child-profile-row:hover {
+    background: #e0f2fe;
+    box-shadow: inset 3px 0 0 #0284c7;
+}
+
+.child-check-cell {
+    width: 44px;
+    text-align: center;
+}
+
+.child-check-cell input[type=checkbox] {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    accent-color: var(--green);
+}
+
+.child-name-cell {
+    font-weight: 600;
+    color: var(--slate-900);
+    text-align: left;
+}
+
+.child-location-cell {
+    color: var(--slate-600);
+    line-height: 1.45;
+    text-align: left;
+}
+
+.child-sex-cell,
+.view-child-sex {
+    white-space: nowrap;
+    text-align: center;
+}
+
+.child-metric-cell,
+.child-age-cell {
+    white-space: nowrap;
+    text-align: center;
+}
+
+.child-status-cell {
+    text-align: center;
+}
+
+.child-table-header {
+    display: inline-block;
+}
+
+.child-table-header .top,
+.child-table-header .bottom {
+    display: block;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.status-pill.is-good {
+    background: #00ff00;
+    color: #000000;
+    border-color: #00cc00;
+}
+
+.status-pill.is-warn {
+    background: #ffff00;
+    color: #000000;
+    border-color: #cccc00;
+}
+
+.status-pill.is-bad {
+    background: #ff0000;
+    color: #000000;
+    border-color: #cc0000;
+}
+
+.status-pill.is-alert {
+    background: #ffc000;
+    color: #000000;
+    border-color: #cc9900;
+}
+
+.status-pill.is-muted {
+    background: var(--slate-100);
+    color: var(--slate-600);
+    border-color: var(--slate-200);
+}
+
+.child-note {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--slate-400);
+}
+
+/* ─── View modal children list ─── */
+.view-child-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--slate-100);
+}
+
+.view-child-item:last-child {
+    border-bottom: none;
+}
+
+.view-child-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+}
+
+.view-detail-block {
+    margin-bottom: 14px;
+}
+
+.view-detail-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--slate-400);
+    margin-bottom: 4px;
+}
+
+.view-detail-value {
+    font-size: 13px;
+    color: var(--slate-800);
+    font-weight: 500;
+}
+
+#viewModalDescription {
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.view-children-table-wrap {
+    max-height: 240px;
+    overflow: auto;
+    border: 1px solid var(--slate-200);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.view-children-table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.view-children-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--slate-900);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, .12);
+    white-space: nowrap;
+}
+
+.view-children-table tbody td {
+    padding: 10px;
+    border-bottom: 1px solid var(--slate-100);
+    color: var(--slate-700);
+    vertical-align: top;
+}
+
+.view-children-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.view-children-table tbody tr.child-profile-row {
+    cursor: pointer;
+    transition: background .14s ease, box-shadow .14s ease;
+}
+
+.view-children-table tbody tr.child-profile-row:hover {
+    background: #e0f2fe;
+    box-shadow: inset 3px 0 0 #0284c7;
+}
+
+.view-child-name {
+    font-weight: 600;
+    color: var(--slate-900);
+    min-width: 180px;
+}
+
+.view-child-location {
+    min-width: 170px;
+    line-height: 1.45;
+    color: var(--slate-600);
+}
+
+/* Edit modal child table style aligned to view modal */
+.child-select-table.edit-like-view thead th {
+    padding: 9px 10px;
+    font-size: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, .12);
+}
+
+.child-select-table.edit-like-view tbody td {
+    padding: 10px;
+    border-bottom: 1px solid var(--slate-100);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.child-select-table.edit-like-view .child-name-cell {
+    font-weight: 600;
+    color: var(--slate-900);
+}
+
+.child-select-table.edit-like-view .child-location-cell {
+    color: var(--slate-600);
+}
+
+/* ─── Empty state ─── */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--slate-400);
+}
+
+.empty-icon {
+    font-size: 42px;
+    margin-bottom: 12px;
+}
+
+.empty-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--slate-600);
+    margin-bottom: 4px;
+}
+
+.empty-sub {
+    font-size: 12px;
+}
+
+/* ─── Section card ─── */
+.section-card {
+    background: #fff;
+    border: 1px solid var(--slate-200);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.section-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--slate-100);
+}
+
+.section-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--slate-900);
+}
+
+.section-card-sub {
+    font-size: 11px;
+    color: var(--slate-500);
+    margin-top: 1px;
+}
+
+/* Full cell colored statuses — see css/growth-status.css */
+.status-severe,
+.status-normal,
+.status-moderate,
+.status-over,
+.status-oor,
+.status-na {
+    font-weight: 600;
+    text-align: center;
+}
