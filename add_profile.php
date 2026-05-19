@@ -482,15 +482,6 @@ if ($gResult) while ($g = $gResult->fetch_assoc()) $guardians[] = $g;
             </div>
         </div>
 
-        <!-- Instructions -->
-        <div class="mb-6 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/80 p-4 text-[0.85rem] text-black shadow-sm backdrop-blur-sm font-sans">
-            <div class="flex shrink-0 items-center justify-center text-black">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-            </div>
-            <div class="leading-relaxed">
-                Instructions: Fill out the form below to register a child. Ensure all required fields marked with an asterisk (*) are completed accurately. Verify the age is automatically calculated correctly before saving.
-            </div>
-        </div>
 
         <!-- Alerts -->
         <div id="formAlert">

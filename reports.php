@@ -500,15 +500,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
             <div class="bg-white rounded-lg shadow-md p-6 mb-6 no-print">
                 <h1 class="text-2xl font-bold text-slate-900 mb-6">Generate Report</h1>
                 
-                <!-- Instructions -->
-                <div class="mb-6 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/80 p-4 text-[0.85rem] text-black shadow-sm backdrop-blur-sm font-sans">
-                    <div class="flex shrink-0 items-center justify-center text-black">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                    </div>
-                    <div class="leading-relaxed">
-                        Instructions: Select the report type and a specific barangay to generate nutrition summaries or formal reports like the OPT Form 1A. Use Print Report to save or print.
-                    </div>
-                </div>
+
 
                 <form method="POST" class="space-y-4" id="reportForm">
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -644,7 +636,6 @@ function getAgeGroup($ageMonths, $ageGroups) {
                             <div class="opt1a-header">
                                 <div style="position: relative; padding-top: 0;">
                                     <div style="position: absolute; top: 0; left: 40px; font-size: 8.5pt;">
-                                        <div style="color: blue; text-decoration: underline; font-weight: bold; margin-bottom: 2px;">PRINTING INSTRUCTIONS</div>
                                         <div># pages for printing: <span style="margin-left: 12px;">3</span></div>
                                     </div>
                                     
@@ -1066,29 +1057,41 @@ function getAgeGroup($ageMonths, $ageGroups) {
 
                             <div class="opt1a-signatories" style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 8pt;">
                                 <!-- Prepared By -->
-                                <div class="opt1a-signatory-block" style="display: flex; gap: 8px; align-items: flex-end;">
+                                <div class="opt1a-signatory-block" style="display: flex; gap: 8px; align-items: flex-start;">
                                     <div class="opt1a-signatory-label-single">Prepared by:</div>
                                     <div style="display: flex; flex-direction: column; align-items: center;">
                                         <div class="opt1a-signatory-line"></div>
                                         <div class="opt1a-signatory-text opt1a-signatory-text-single">Name and Signature of Barangay Nutrition Scholar</div>
+                                        <div class="opt1a-signatory-date">
+                                            <span class="opt1a-signatory-date-label">Date:</span>
+                                            <div class="opt1a-signatory-date-line"></div>
+                                        </div>
                                     </div>
                                 </div>
                                 
                                 <!-- Checked By -->
-                                <div class="opt1a-signatory-block" style="display: flex; gap: 8px; align-items: flex-end;">
+                                <div class="opt1a-signatory-block" style="display: flex; gap: 8px; align-items: flex-start;">
                                     <div class="opt1a-signatory-label-double">Checked:</div>
                                     <div class="opt1a-signatory-column-shift" style="display: flex; flex-direction: column; align-items: center;">
                                         <div class="opt1a-signatory-line"></div>
                                         <div class="opt1a-signatory-text opt1a-signatory-text-double opt1a-signatory-text-shift">Name and Signature of Midwife/Nurse/MNAO/MHO or<br>District/City Nutrition Program Coordinator</div>
+                                        <div class="opt1a-signatory-date">
+                                            <span class="opt1a-signatory-date-label">Date:</span>
+                                            <div class="opt1a-signatory-date-line"></div>
+                                        </div>
                                     </div>
                                 </div>
 
                                 <!-- Approved By -->
-                                <div class="opt1a-signatory-block" style="display: flex; gap: 8px; align-items: flex-end;">
+                                <div class="opt1a-signatory-block" style="display: flex; gap: 8px; align-items: flex-start;">
                                     <div class="opt1a-signatory-label-double">Approved:</div>
                                     <div class="opt1a-signatory-column-shift" style="display: flex; flex-direction: column; align-items: center;">
                                         <div class="opt1a-signatory-line"></div>
                                         <div class="opt1a-signatory-text opt1a-signatory-text-triple opt1a-signatory-text-shift">Name and Signature of Barangay Captain,<br>BNC Chairperson</div>
+                                        <div class="opt1a-signatory-date">
+                                            <span class="opt1a-signatory-date-label">Date:</span>
+                                            <div class="opt1a-signatory-date-line"></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1135,7 +1138,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                     .print-signatories {
                                         display: flex !important;
                                         position: static !important;
-                                        margin-top: 25px !important;
+                                        margin-top: 12px !important;
                                         background-color: white !important;
                                         z-index: 9999;
                                         page-break-inside: avoid !important;
@@ -1169,7 +1172,6 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
                                     <div style="width: 30%;">
                                         <div style="font-size: 10pt; margin-bottom: 5px;">Page 1</div>
-                                        <div style="margin-left: 30px;"><a href="#" style="color: blue; text-decoration: underline; font-size: 10pt;">PRINTING INSTRUCTIONS</a></div>
                                         <div style="margin-top: 15px; font-weight: bold; font-size: 11pt;">YEAR: <?= $selectedYear ?></div>
                                     </div>
                                     <div style="width: 40%; text-align: center; font-size: 11.5pt; line-height: 1.3; padding-top: 15px;">
@@ -1348,7 +1350,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                                 <!-- Spacer for print page layout -->
                                                 <div class="print-signatories-spacer"></div>
                                                 <!-- Compact signatories block -->
-                                                <div class="print-signatories" style="display: flex; justify-content: space-between; font-size: 8.5pt; width: 100%; line-height: 1.1; margin-top: 30px;">
+                                                <div class="print-signatories" style="display: flex; justify-content: space-between; font-size: 8.5pt; width: 100%; line-height: 1.1; margin-top: 15px;">
                                                     <div style="width: 32%;">
                                                         <div style="display: flex; margin-bottom: 2px;">
                                                             <div style="width: 70px; font-weight: bold; margin-top: -2px;">Prepared by:</div>
@@ -1416,6 +1418,11 @@ function getAgeGroup($ageMonths, $ageGroups) {
                             <!-- Hidden iframe for automatic printing (child_profiles.php handles its own print trigger) -->
                             <iframe src="child_profiles.php?barangay_id=<?= $selectedBarangayId ?>&month_from=<?= $selectedMonthFrom ?>&month_to=<?= $selectedMonthTo ?>&year=<?= $selectedYear ?>&print_report=1" style="width:0; height:0; border:none; visibility:hidden; position:absolute; z-index:-1;" id="nutStatusIframe"></iframe>
                         <?php else: ?>
+                        <style>
+                            @media print {
+                                .print-wrap { padding: 0 !important; padding-left: 25mm !important; margin: 0 !important; max-width: 100% !important; }
+                            }
+                        </style>
                         <!-- Header -->
                         <div class="opt-header">
                             <div class="opt-header-top">

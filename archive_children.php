@@ -1,7 +1,87 @@
 <?php
 session_start();
 require_once __DIR__ . '/access_control.php';
-enforce_page_access();
+
+$isArchiveChildAction = ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'archive_child');
+
+if ($isArchiveChildAction) {
+    enforce_page_access(['expectsJson' => true, 'page' => 'archive_child.php']);
+    require_once __DIR__ . '/database.php';
+    require_once __DIR__ . '/activity_logger.php';
+    header('Content-Type: application/json');
+
+    $childId = isset($_POST['child_id']) ? (int)$_POST['child_id'] : 0;
+    $archiveStatus = isset($_POST['status']) ? trim((string)$_POST['status']) : '';
+    $statusDate = isset($_POST['status_date']) ? trim((string)$_POST['status_date']) : '';
+    $allowedArchiveStatuses = ['Archive', 'Decease', 'OverAge'];
+
+    if ($childId <= 0) {
+        echo json_encode(['success' => false, 'message' => 'Invalid child ID.']);
+        exit;
+    }
+
+    if (!in_array($archiveStatus, $allowedArchiveStatuses, true)) {
+        echo json_encode(['success' => false, 'message' => 'Invalid archive status selected.']);
+        exit;
+    }
+
+    if ($statusDate === '') {
+        echo json_encode(['success' => false, 'message' => 'Archival date is required.']);
+        exit;
+    }
+
+    $childFullName = '';
+    $nameStmt = $conn->prepare('SELECT first_name, middle_name, last_name, suffix FROM children WHERE child_id = ?');
+    if ($nameStmt) {
+        $nameStmt->bind_param('i', $childId);
+        if ($nameStmt->execute()) {
+            $nameStmt->bind_result($firstName, $middleName, $lastName, $suffix);
+            if ($nameStmt->fetch()) {
+                $nameParts = array_filter([
+                    trim((string)$firstName),
+                    trim((string)$middleName),
+                    trim((string)$lastName),
+                    trim((string)$suffix)
+                ]);
+                $childFullName = trim(implode(' ', $nameParts));
+            }
+        }
+        $nameStmt->close();
+    }
+
+    $stmt = $conn->prepare('UPDATE children SET status = ?, status_date = ? WHERE child_id = ?');
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Failed to prepare archive query.']);
+        exit;
+    }
+    $stmt->bind_param('ssi', $archiveStatus, $statusDate, $childId);
+
+    if (!$stmt->execute()) {
+        $stmt->close();
+        echo json_encode(['success' => false, 'message' => 'Failed to archive child profile.']);
+        exit;
+    }
+
+    if ($stmt->affected_rows < 1) {
+        $stmt->close();
+        echo json_encode(['success' => false, 'message' => 'Child profile not found or already archived.']);
+        exit;
+    }
+
+    $stmt->close();
+
+    $detailParts = ['Status: ' . $archiveStatus];
+    if ($childFullName !== '') {
+        $detailParts[] = 'Child: ' . $childFullName;
+    }
+    $details = 'Archived child profile (' . implode(', ', $detailParts) . ')';
+    log_user_activity($conn, (int)($_SESSION['user_id'] ?? 0), 'archive_child', $details);
+
+    echo json_encode(['success' => true, 'message' => 'Child profile archived successfully.']);
+    exit;
+}
+
+enforce_page_access(['page' => 'archive_children.php']);
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/activity_logger.php';
 
@@ -9,7 +89,7 @@ require_once __DIR__ . '/activity_logger.php';
  * AUTO-CLEANUP:
  * Automatically remove children who have been archived for more than 1 year.
  */
-$cleanupStatuses = ["'Archive'", "'Disease'", "'OverAge'"];
+$cleanupStatuses = ["'Archive'", "'Decease'", "'OverAge'"];
 $statusListStr = implode(',', $cleanupStatuses);
 
 // 1. Identify children to be deleted
@@ -38,7 +118,7 @@ if ($expiredRes && $expiredRes->num_rows > 0) {
 }
 
 $tab = isset($_GET['tab']) ? trim((string)$_GET['tab']) : 'all';
-$allowedTabs = ['all', 'Archive', 'Disease', 'OverAge'];
+$allowedTabs = ['all', 'Archive', 'Decease', 'OverAge'];
 if (!in_array($tab, $allowedTabs, true)) { $tab = 'all'; }
 
 $currentUserId = (int)($_SESSION['user_id'] ?? 0);
@@ -50,7 +130,7 @@ $assignedBarangayId = isset($_SESSION['barangay_id']) ? (int)$_SESSION['barangay
 // Tab counts
 $countQuery = "SELECT
     SUM(CASE WHEN c.status = 'Archive' THEN 1 ELSE 0 END) AS archive_count,
-    SUM(CASE WHEN c.status = 'Disease' THEN 1 ELSE 0 END) AS disease_count,
+    SUM(CASE WHEN c.status = 'Decease' THEN 1 ELSE 0 END) AS decease_count,
     SUM(CASE WHEN c.status = 'OverAge' THEN 1 ELSE 0 END) AS overage_count
     FROM children c";
 
@@ -64,13 +144,13 @@ if ($isBns) {
 }
 
 $countResult = $conn->query($countQuery);
-$counts = ['Archive' => 0, 'Disease' => 0, 'OverAge' => 0];
+$counts = ['Archive' => 0, 'Decease' => 0, 'OverAge' => 0];
 if ($countResult && $countRow = $countResult->fetch_assoc()) {
     $counts['Archive'] = (int)($countRow['archive_count'] ?? 0);
-    $counts['Disease'] = (int)($countRow['disease_count'] ?? 0);
+    $counts['Decease'] = (int)($countRow['decease_count'] ?? 0);
     $counts['OverAge'] = (int)($countRow['overage_count'] ?? 0);
 }
-$counts['all'] = $counts['Archive'] + $counts['Disease'] + $counts['OverAge'];
+$counts['all'] = $counts['Archive'] + $counts['Decease'] + $counts['OverAge'];
 
 // Main query — include is_ip
 $sql = "SELECT c.child_id, c.first_name, c.middle_name, c.last_name, c.suffix,
@@ -81,7 +161,7 @@ $sql = "SELECT c.child_id, c.first_name, c.middle_name, c.last_name, c.suffix,
         FROM children c
         LEFT JOIN barangays b ON c.barangay_id = b.barangay_id
         LEFT JOIN guardians g ON c.guardian_id = g.guardian_id
-        WHERE c.status IN ('Archive', 'Disease', 'OverAge')";
+        WHERE c.status IN ('Archive', 'Decease', 'OverAge')";
 if ($tab !== 'all') {
     $sql .= " AND c.status = '" . $conn->real_escape_string($tab) . "'";
 }
@@ -212,7 +292,7 @@ sort($uniqueBarangays);
         <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-lg">🗂️</div>
         <div>
             <h1 class="text-lg font-bold text-slate-900">Archived Children</h1>
-            <p class="mt-0.5 text-xs text-slate-500">Children profiles with status Archive, Disease, or OverAge.</p>
+            <p class="mt-0.5 text-xs text-slate-500">Children profiles with status Archive, Decease, or OverAge.</p>
         </div>
     </div>
 
@@ -220,7 +300,7 @@ sort($uniqueBarangays);
     <div class="flex flex-wrap gap-2 mb-4">
         <a href="archive_children.php?tab=all"     class="rounded-full px-3 py-1.5 text-xs font-semibold <?= $tab === 'all'     ? 'bg-slate-800 text-white'   : 'bg-white text-slate-700 border border-slate-300' ?>">All (<?= $counts['all'] ?>)</a>
         <a href="archive_children.php?tab=Archive"  class="rounded-full px-3 py-1.5 text-xs font-semibold <?= $tab === 'Archive'  ? 'bg-rose-700 text-white'    : 'bg-white text-slate-700 border border-slate-300' ?>">Archive (<?= $counts['Archive'] ?>)</a>
-        <a href="archive_children.php?tab=Disease"  class="rounded-full px-3 py-1.5 text-xs font-semibold <?= $tab === 'Disease'  ? 'bg-amber-700 text-white'   : 'bg-white text-slate-700 border border-slate-300' ?>">Disease (<?= $counts['Disease'] ?>)</a>
+        <a href="archive_children.php?tab=Decease"  class="rounded-full px-3 py-1.5 text-xs font-semibold <?= $tab === 'Decease'  ? 'bg-amber-700 text-white'   : 'bg-white text-slate-700 border border-slate-300' ?>">Decease (<?= $counts['Decease'] ?>)</a>
         <a href="archive_children.php?tab=OverAge"  class="rounded-full px-3 py-1.5 text-xs font-semibold <?= $tab === 'OverAge'  ? 'bg-indigo-700 text-white'  : 'bg-white text-slate-700 border border-slate-300' ?>">OverAge (<?= $counts['OverAge'] ?>)</a>
     </div>
 
@@ -307,7 +387,7 @@ sort($uniqueBarangays);
 
                     $badgeClass = 'bg-slate-200 text-slate-700';
                     if ($row['status'] === 'Archive') $badgeClass = 'bg-rose-100 text-rose-700';
-                    if ($row['status'] === 'Disease')  $badgeClass = 'bg-amber-100 text-amber-700';
+                    if ($row['status'] === 'Decease')  $badgeClass = 'bg-amber-100 text-amber-700';
                     if ($row['status'] === 'OverAge')  $badgeClass = 'bg-indigo-100 text-indigo-700';
                 ?>
                 <tr class="hover:bg-slate-50"
@@ -340,12 +420,14 @@ sort($uniqueBarangays);
                         <div class="flex items-center justify-center gap-1.5">
                             <a href="view_child_profile.php?child_id=<?= (int)$row['child_id'] ?>"
                                class="inline-flex rounded-md bg-emerald-600 px-2.5 py-1 text-[0.72rem] text-white font-semibold hover:bg-emerald-700">View</a>
+                            <?php if ($row['status'] === 'Archive'): ?>
                             <button type="button" 
                                     class="btn-restore inline-flex rounded-md bg-blue-600 px-2.5 py-1 text-[0.72rem] text-white font-semibold hover:bg-blue-700"
                                     data-child-id="<?= (int)$row['child_id'] ?>"
                                     data-full-name="<?= htmlspecialchars($fullName) ?>">
                                 Restore
                             </button>
+                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>

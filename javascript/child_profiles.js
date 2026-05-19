@@ -1053,11 +1053,12 @@ document.addEventListener('DOMContentLoaded', () => {
         btnArchiveConfirm.textContent = 'Archiving...';
 
         const formData = new FormData();
+        formData.append('action', 'archive_child');
         formData.append('child_id', archiveChildId);
         formData.append('status', reason);
         formData.append('status_date', date);
 
-        fetch('archive_child.php', {
+        fetch('archive_children.php', {
             method: 'POST',
             body: formData
         })
@@ -1066,13 +1067,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (json.success) {
                     showToast('success', json.message || 'Child profile archived.');
                     closeArchiveModal();
-                    const row = document.querySelector(`tr[data-child-id="${archiveChildId}"]`);
-                    if (row) row.remove();
-                    const rowCount = document.getElementById('rowCount');
-                    if (rowCount) {
-                        const current = parseInt(rowCount.textContent || '0', 10) || 0;
-                        rowCount.textContent = `${Math.max(0, current - 1)} records`;
-                    }
+                    setTimeout(() => {
+                        window.location.href = 'archive_children.php';
+                    }, 1000);
                 } else {
                     showToast('error', json.message || 'Error archiving child.');
                     btnArchiveConfirm.disabled = false;

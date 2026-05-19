@@ -476,15 +476,6 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
         <?php endif; ?>
     </div>
 
-    <!-- ── Instructions ── -->
-    <div class="alert info" style="margin-bottom: 24px; display: flex; gap: 12px; align-items: center; padding: 16px 18px; border-radius: 14px; background: rgba(254, 242, 242, 0.85); border: 1px solid #fee2e2; color: #000000; backdrop-filter: blur(4px); box-shadow: 0 1px 3px rgba(0,0,0,0.02); font-family: inherit;">
-        <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #000000;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-        </div>
-        <div style="font-size: 0.85rem; line-height: 1.5; margin: 0;">
-            Instructions: Update your account information here. Ensure you choose a strong password. If you are an admin, you can also use this page to create new users or check Activity Logs.
-        </div>
-    </div>
 
     <!-- ── Nav Tabs ── -->
     <nav class="settings-nav">

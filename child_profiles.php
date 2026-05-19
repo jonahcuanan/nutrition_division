@@ -716,15 +716,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
         </div>
     </div>
 
-    <!-- Instructions -->
-    <div class="no-print mb-6 flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/80 p-4 text-[0.8rem] text-black shadow-sm backdrop-blur-sm font-sans">
-        <div class="flex shrink-0 items-center justify-center text-black">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-        </div>
-        <div class="leading-relaxed">
-            Instructions: Browse the list of registered children. Use the filters to find specific records, and use the actions menu to view full details, update their latest measurement, or archive the record.
-        </div>
-    </div>
+
 
     <!-- Toolbar -->
     <div class="no-print mb-4 flex flex-col gap-2.5 child-toolbar">
@@ -1513,7 +1505,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                         <select id="archiveReason" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-100">
                             <option value="">Select status</option>
                             <option value="Archive">Archive</option>
-                            <option value="Disease">Disease</option>
+                            <option value="Decease">Decease</option>
                             <option value="OverAge">OverAge</option>
                         </select>
                     </div>

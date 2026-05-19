@@ -53,7 +53,7 @@
     }
 
     .opt1a-table {
-        font-size: 8pt !important;
+        font-size: calc(8pt - 1px) !important;
     }
 
     .opt1a-table th {
@@ -421,7 +421,7 @@
 .opt1a-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 8.5pt;
+    font-size: calc(8.5pt - 1px);
     border: 2px solid #000;
 }
 
@@ -451,7 +451,7 @@
 }
 
 .opt1a-table .opt1a-age-header {
-    font-size: 7.5pt;
+    font-size: calc(7.5pt - 1px);
     line-height: 1.05;
     padding: 2px 3px;
     white-space: normal;
@@ -459,7 +459,7 @@
 }
 
 .opt1a-table .opt1a-age-cell {
-    font-size: 7.5pt;
+    font-size: calc(7.5pt - 1px);
     line-height: 1.1;
     padding: 2px 3px;
     vertical-align: top;
@@ -478,13 +478,15 @@
 
 .opt1a-signatory-label-single {
     width: 56px;
-    margin-bottom: 25px;
+    margin-bottom: 0;
+    margin-top: 2px;
     font-weight: 500;
 }
 
 .opt1a-signatory-label-double {
     width: 25px;
-    margin-bottom: 25px;
+    margin-bottom: 0;
+    margin-top: 10px;
     font-weight: 500;
 }
 
@@ -495,7 +497,7 @@
 .opt1a-signatory-line {
     width: 180px;
     height: 16px;
-    margin-right:100px;
+    margin-right: 100px;
     background-color: #00b050;
     border-bottom: 1px solid #000;
 }
@@ -511,19 +513,42 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-right:70px;
+    margin-right: 70px;
 }
 
 .opt1a-signatory-text-double {
     min-height: 2.3em;
-    margin-right:80px;
+    margin-right: 80px;
 }
 
 .opt1a-signatory-text-triple {
-  margin-right:140px;
+    margin-right: 140px;
 }
 
 .opt1a-signatory-text-shift {
     position: relative;
     left: 15px;
+}
+
+.opt1a-signatory-date {
+    width: 180px;
+    margin-right: 100px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    left: -30px;
+}
+
+.opt1a-signatory-date-label {
+    font-size: 8pt;
+    font-weight: 500;
+}
+
+.opt1a-signatory-date-line {
+    flex-grow: 1;
+    height: 16px;
+    background-color: #00b050;
+    border-bottom: 1px solid #000;
 }
