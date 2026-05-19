@@ -5,7 +5,7 @@
 
 @page {
     size: legal landscape;
-    margin: 0.5cm 0 0 0;
+    margin: 0.7cm;
 }
 
 @page :first {
@@ -39,6 +39,7 @@
     .print-wrap {
         margin: 0 !important;
         padding: 0 !important;
+        padding-left: 10mm !important;
     }
 
     .report-container {
@@ -48,16 +49,30 @@
         page-break-before: avoid;
         width: 100% !important;
         max-width: 100% !important;
-        zoom: 102%;
+        zoom: 100%;
     }
 
     .opt1a-table {
         font-size: 8pt !important;
     }
 
-    .opt1a-table th,
-    .opt1a-table td {
+    .opt1a-table th {
         padding: 2px !important;
+    }
+
+    .opt1a-table td {
+        padding: 0.5px 1px !important;
+        line-height: 1 !important;
+    }
+
+    .opt1a-note {
+        margin-top: 2px !important;
+        font-size: 6.5pt !important;
+    }
+
+    .opt1a-signatories {
+        margin-top: 4px !important;
+        font-size: 7.5pt !important;
     }
 
     .opt1b-wrap {
@@ -66,6 +81,11 @@
         margin: 0 !important;
         padding: 10mm 8mm !important;
         font-size: 9.5pt;
+    }
+
+    .opt1a-print-shift {
+        padding-left: 15mm !important;
+        padding-right: 0 !important;
     }
 }
 
@@ -430,8 +450,80 @@
     font-weight: 700;
 }
 
+.opt1a-table .opt1a-age-header {
+    font-size: 7.5pt;
+    line-height: 1.05;
+    padding: 2px 3px;
+    white-space: normal;
+    vertical-align: middle;
+}
+
+.opt1a-table .opt1a-age-cell {
+    font-size: 7.5pt;
+    line-height: 1.1;
+    padding: 2px 3px;
+    vertical-align: top;
+    white-space: normal;
+}
+
 .opt1a-note {
     margin-top: 6px;
     font-size: 8pt;
     line-height: 1.2;
+}
+
+.opt1a-signatory-block {
+    margin-top: 6px;
+}
+
+.opt1a-signatory-label-single {
+    width: 56px;
+    margin-bottom: 25px;
+    font-weight: 500;
+}
+
+.opt1a-signatory-label-double {
+    width: 25px;
+    margin-bottom: 25px;
+    font-weight: 500;
+}
+
+.opt1a-signatory-column-shift {
+    margin-top: 8px;
+}
+
+.opt1a-signatory-line {
+    width: 180px;
+    height: 16px;
+    margin-right:100px;
+    background-color: #00b050;
+    border-bottom: 1px solid #000;
+}
+
+.opt1a-signatory-text {
+    text-align: center;
+    margin-top: 2px;
+    line-height: 1.15;
+}
+
+.opt1a-signatory-text-single {
+    min-height: 2.3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right:70px;
+}
+
+.opt1a-signatory-text-double {
+    min-height: 2.3em;
+    margin-right:80px;
+}
+
+.opt1a-signatory-text-triple {
+  margin-right:140px;
+}
+
+.opt1a-signatory-text-shift {
+    position: relative;
+    left: 15px;
 }

@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!val) {
             message = 'Complete address is required.';
         } else if (purokOnlyPattern.test(val)) {
-            message = 'Add details after Purok (e.g., Purok 3, Sitio).';
+            message = 'Add details after Purok (e.g., Purok 3).';
         }
 
         addressField.setCustomValidity(message);

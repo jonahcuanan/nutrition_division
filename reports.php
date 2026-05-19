@@ -624,6 +624,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
                     <!-- Report Content -->
                     <div class="report-container print:!mt-0" id="reportContent">
                         <?php if ($selectedReportType === 'opt_form1a'): ?>
+                            <div class="opt1a-print-shift">
                             <?php
                                 $wfaCategories = [
                                     'WFA-Normal' => 'Normal (N)',
@@ -752,7 +753,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
                             <table class="opt1a-table">
                                 <thead>
                                     <tr>
-                                        <th rowspan="4" style="vertical-align: middle; padding: 4px; white-space: nowrap;">Age<br>Group<br><br><span style="font-weight: normal;">(1)</span></th>
+                                        <th rowspan="4" class="opt1a-age-header">Age<br>Group<br><br><span style="font-weight: normal;">(1)</span></th>
                                         <th colspan="19" class="opt1a-group-title">Weight for Age Status</th>
                                         <th colspan="8" class="opt1a-group-title">Total, by age group</th>
                                     </tr>
@@ -830,7 +831,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                             $owPrev = $totalByAge > 0 ? ($owTotal / $totalByAge) * 100 : 0.0;
                                         ?>
                                         <tr>
-                                            <td style="font-size: 8pt; line-height: 1.1; vertical-align: top; padding-top: 4px;">
+                                            <td class="opt1a-age-cell">
                                                 <?= $ag ?><br>months<br><span style="font-size: 7pt; font-style: italic;">(R<?= $rn ?>)</span>
                                             </td>
                                             <!-- Normal: Boys cols(2)(3), Girls cols(4)(5) -->
@@ -888,7 +889,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                             $suwTotal23 = $suwBoys23 + $suwGirls23;
                                             $owTotal23 = $owBoys23 + $owGirls23;
                                         ?>
-                                        <td style="font-size: 8pt; line-height: 1.1; vertical-align: top; padding-top: 4px;"><strong>Total (R7)</strong><br>0-23 mos</td>
+                                        <td class="opt1a-age-cell"><strong>Total (R7)</strong><br>0-23 mos</td>
                                         <!-- Normal Boys cols(2)(3), Girls cols(4)(5) -->
                                         <td colspan="2"><?= $normalBoys23 ?></td>
                                         <td colspan="2"><?= $normalGirls23 ?></td>
@@ -934,7 +935,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                             $suwPrevOverall23 = $totalByAge23 > 0 ? ($suwTotal23 / $totalByAge23) * 100 : 0.0;
                                             $owPrevOverall23 = $totalByAge23 > 0 ? ($owTotal23 / $totalByAge23) * 100 : 0.0;
                                         ?>
-                                        <td style="font-size: 8pt; line-height: 1.1; vertical-align: top; padding-top: 4px;">Prevalence(%)<br>0-23 mos</td>
+                                        <td class="opt1a-age-cell">Prevalence(%)<br>0-23 mos</td>
                                         <!-- Normal Boys cols(2)(3), Girls cols(4)(5) -->
                                         <td colspan="2"><?= number_format($normalPrevBoys23, 1) ?></td>
                                         <td colspan="2"><?= number_format($normalPrevGirls23, 1) ?></td>
@@ -1063,33 +1064,34 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                 <strong style="font-size: 8pt;">Use WEIGHT-FOR-LENGTH or WEIGHT-FOR-HEIGHT to correctly determine overweight and obesity</strong>
                             </div>
 
-                            <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 8pt;">
+                            <div class="opt1a-signatories" style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 8pt;">
                                 <!-- Prepared By -->
-                                <div style="display: flex; gap: 8px; align-items: flex-end;">
-                                    <div style="margin-bottom: 2px;">Prepared by:</div>
+                                <div class="opt1a-signatory-block" style="display: flex; gap: 8px; align-items: flex-end;">
+                                    <div class="opt1a-signatory-label-single">Prepared by:</div>
                                     <div style="display: flex; flex-direction: column; align-items: center;">
-                                        <div style="width: 180px; height: 16px; background-color: #00b050; border-bottom: 1px solid #000;"></div>
-                                        <div style="text-align: center; margin-top: 2px;">Name and Signature of Barangay Nutrition Scholar</div>
+                                        <div class="opt1a-signatory-line"></div>
+                                        <div class="opt1a-signatory-text opt1a-signatory-text-single">Name and Signature of Barangay Nutrition Scholar</div>
                                     </div>
                                 </div>
                                 
                                 <!-- Checked By -->
-                                <div style="display: flex; gap: 8px; align-items: flex-end;">
-                                    <div style="margin-bottom: 2px;">Checked:</div>
-                                    <div style="display: flex; flex-direction: column; align-items: center;">
-                                        <div style="width: 220px; height: 16px; background-color: #00b050; border-bottom: 1px solid #000;"></div>
-                                        <div style="text-align: center; margin-top: 2px;">Name and Signature of Midwife/Nurse/MNAO/MHO or<br>District/City Nutrition Program Coordinator</div>
+                                <div class="opt1a-signatory-block" style="display: flex; gap: 8px; align-items: flex-end;">
+                                    <div class="opt1a-signatory-label-double">Checked:</div>
+                                    <div class="opt1a-signatory-column-shift" style="display: flex; flex-direction: column; align-items: center;">
+                                        <div class="opt1a-signatory-line"></div>
+                                        <div class="opt1a-signatory-text opt1a-signatory-text-double opt1a-signatory-text-shift">Name and Signature of Midwife/Nurse/MNAO/MHO or<br>District/City Nutrition Program Coordinator</div>
                                     </div>
                                 </div>
 
                                 <!-- Approved By -->
-                                <div style="display: flex; gap: 8px; align-items: flex-end;">
-                                    <div style="margin-bottom: 2px;">Approved:</div>
-                                    <div style="display: flex; flex-direction: column; align-items: center;">
-                                        <div style="width: 180px; height: 16px; background-color: #00b050; border-bottom: 1px solid #000;"></div>
-                                        <div style="text-align: center; margin-top: 2px;">Name and Signature of Barangay Captain,<br>BNC Chairperson</div>
+                                <div class="opt1a-signatory-block" style="display: flex; gap: 8px; align-items: flex-end;">
+                                    <div class="opt1a-signatory-label-double">Approved:</div>
+                                    <div class="opt1a-signatory-column-shift" style="display: flex; flex-direction: column; align-items: center;">
+                                        <div class="opt1a-signatory-line"></div>
+                                        <div class="opt1a-signatory-text opt1a-signatory-text-triple opt1a-signatory-text-shift">Name and Signature of Barangay Captain,<br>BNC Chairperson</div>
                                     </div>
                                 </div>
+                            </div>
                             </div>
                         <?php elseif ($selectedReportType === 'opt_form1b'): ?>
                             <style>
@@ -1122,7 +1124,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                         margin: 0.3in !important;
                                     }
                                     .no-print { display: none !important; }
-                                    .print-wrap { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+                                    .print-wrap { padding: 0 !important; padding-left: 25mm !important; margin: 0 !important; max-width: 100% !important; }
                                     thead { display: table-header-group !important; }
                                     tfoot { display: table-footer-group !important; }
                                     tr { page-break-inside: avoid !important; }
@@ -1346,13 +1348,13 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                                 <!-- Spacer for print page layout -->
                                                 <div class="print-signatories-spacer"></div>
                                                 <!-- Compact signatories block -->
-                                                <div class="print-signatories" style="display: flex; justify-content: space-between; font-size: 8.5pt; width: 100%; line-height: 1.1; margin-top: 35px;">
+                                                <div class="print-signatories" style="display: flex; justify-content: space-between; font-size: 8.5pt; width: 100%; line-height: 1.1; margin-top: 30px;">
                                                     <div style="width: 32%;">
                                                         <div style="display: flex; margin-bottom: 2px;">
-                                                            <div style="width: 70px; font-weight: bold;">Prepared by:</div>
+                                                            <div style="width: 70px; font-weight: bold; margin-top: -2px;">Prepared by:</div>
                                                             <div style="flex-grow: 1; text-align: left;">
                                                                 <div style="border-bottom: 1px solid #000; height: 14px;"></div>
-                                                                <div style="font-size: 7.5pt; margin-top: 1px;">Name and Signature of Barangay Nutrition Scholar</div>
+                                                                <div style="font-size: 7.5pt; margin-top: 1px; padding-left: 6px;">Name and Signature of Barangay Nutrition Scholar</div>
                                                             </div>
                                                         </div>
                                                         <div style="display: flex;">
@@ -1363,7 +1365,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                                     
                                                     <div style="width: 32%;">
                                                         <div style="display: flex; margin-bottom: 2px;">
-                                                            <div style="width: 60px; font-weight: bold;">Checked:</div>
+                                                            <div style="width: 60px; font-weight: bold; margin-top: -2px;">Checked:</div>
                                                             <div style="flex-grow: 1; text-align: left;">
                                                                 <div style="border-bottom: 1px solid #000; height: 14px;"></div>
                                                                 <div style="font-size: 7.5pt; margin-top: 1px;">Name and Signature of DCNPC/Nutritionist/Nurse/Midwife/MNAO</div>
@@ -1377,7 +1379,7 @@ function getAgeGroup($ageMonths, $ageGroups) {
 
                                                     <div style="width: 32%;">
                                                         <div style="display: flex; margin-bottom: 2px;">
-                                                            <div style="width: 65px; font-weight: bold;">Approved:</div>
+                                                            <div style="width: 65px; font-weight: bold; margin-top: -2px;">Approved:</div>
                                                             <div style="flex-grow: 1; text-align: left;">
                                                                 <div style="border-bottom: 1px solid #000; height: 14px;"></div>
                                                                 <div style="font-size: 7.5pt; margin-top: 1px;">Name and Signature of Barangay Captain / BNC Chairperson</div>

@@ -8,6 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnUpdateCancel = document.getElementById('btnUpdateCancel');
     const updateModalMessage = document.getElementById('updateModalMessage');
 
+    let originalBarangayId = null;
+    let originalBnsUserId = null;
+    let originalBnsUserName = '';
+    let initialFormSnapshot = '';
+
     const profileSection = document.getElementById('profileEditSection');
     const measurementSection = document.getElementById('measurementSection');
     const muacUpdateContainer = document.getElementById('muacUpdateContainer');
@@ -99,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateModal.classList.add('invisible', 'pointer-events-none');
             updateModal.classList.remove('opacity-100');
             document.body.classList.remove('update-modal-open');
+            updateModalBox.classList.remove('modal--profile');
             updateForm.reset();
             updateModalMessage.innerHTML = '';
             resetPreviews();
@@ -149,6 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 modalTitle.textContent = 'Update Growth Measurement';
                 modalInstr.textContent = 'Enter the latest height and weight for this child';
                 // MUAC remains hidden in measurement mode
+                updateModalBox.classList.remove('modal--profile');
             } else if (mode === 'muac') {
                 measurementSection.classList.remove('hidden');
                 muacUpdateContainer.classList.remove('hidden');
@@ -166,11 +173,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 modalTitle.textContent = 'Update MUAC Measurement';
                 modalInstr.textContent = 'Enter the latest MUAC for this child (Height/Weight will be preserved)';
+                updateModalBox.classList.remove('modal--profile');
             } else if (mode === 'profile') {
                 profileSection.classList.remove('hidden');
                 profileSection.open = true;
                 modalTitle.textContent = 'Edit Child Profile';
                 modalInstr.textContent = 'Update basic information and identity details';
+                updateModalBox.classList.add('modal--profile');
             }
 
             // Fetch Child Data
@@ -191,6 +200,37 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('edit_g_first').value = d.guardian_first || '';
                         document.getElementById('edit_g_last').value = d.guardian_last || '';
                         document.getElementById('edit_ip').value = d.is_ip || 'No';
+
+                        const editBarangaySelect = document.getElementById('edit_barangay_id');
+                        const hiddenEditBarangayInput = document.getElementById('hidden_edit_barangay_id');
+                        if (editBarangaySelect) {
+                            editBarangaySelect.value = d.barangay_id || '';
+                        }
+                        if (hiddenEditBarangayInput) {
+                            hiddenEditBarangayInput.value = d.barangay_id || '';
+                        }
+                        const editDesignatedUserIdInput = document.getElementById('edit_designated_user_id');
+                        const editDesignatedUserNameInput = document.getElementById('edit_designated_user_name');
+
+                        originalBarangayId = d.barangay_id || 0;
+                        originalBnsUserId = d.recorded_by || null;
+
+                        let fullName = 'No BNS Assigned';
+                        if (d.bns_first_name || d.bns_last_name) {
+                            const parts = [];
+                            if (d.bns_first_name) parts.push(d.bns_first_name.trim());
+                            if (d.bns_last_name) parts.push(d.bns_last_name.trim());
+                            fullName = parts.join(' ');
+                        }
+                        originalBnsUserName = fullName;
+
+                        if (editDesignatedUserIdInput) {
+                            editDesignatedUserIdInput.value = d.recorded_by || '';
+                        }
+                        if (editDesignatedUserNameInput) {
+                            editDesignatedUserNameInput.value = fullName;
+                            editDesignatedUserNameInput.classList.remove('animate-pulse');
+                        }
 
                         // Check if middle name and suffix are available
                         if (document.getElementById('edit_middle_name')) {
@@ -222,6 +262,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
 
                         calculateAge();
+                        initialFormSnapshot = getFormSnapshot();
+                        if (btnUpdateSave) {
+                            btnUpdateSave.disabled = true;
+                            btnUpdateSave.classList.add('opacity-70', 'cursor-not-allowed');
+                        }
                         openUpdateModal();
                     } else {
                         showToast('error', 'Error fetching child profile: ' + (json.message || 'Unknown error'));
@@ -314,6 +359,159 @@ document.addEventListener('DOMContentLoaded', () => {
         else el.classList.add('text-slate-400');
     }
 
+    function getFormSnapshot() {
+        const inputs = [
+            'edit_first_name', 'edit_middle_name', 'edit_last_name', 'edit_suffix',
+            'edit_birthdate', 'edit_sex', 'edit_address', 'edit_barangay_id',
+            'edit_designated_user_id', 'edit_g_first', 'edit_g_last', 'edit_ip',
+            'measurement_date', 'height', 'weight', 'muac'
+        ];
+        const snapshot = {};
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                snapshot[id] = el.value !== undefined ? String(el.value).trim() : '';
+            }
+        });
+        return JSON.stringify(snapshot);
+    }
+
+    function checkFormChanges() {
+        const currentSnapshot = getFormSnapshot();
+        const isChanged = currentSnapshot !== initialFormSnapshot;
+        if (btnUpdateSave) {
+            btnUpdateSave.disabled = !isChanged;
+            btnUpdateSave.classList.toggle('opacity-70', !isChanged);
+            btnUpdateSave.classList.toggle('cursor-not-allowed', !isChanged);
+        }
+    }
+
+    const userSelectModal = document.getElementById('userSelectModal');
+    const userSelectBox = document.getElementById('userSelectBox');
+    const userSelectLoading = document.getElementById('userSelectLoading');
+    const userSelectEmpty = document.getElementById('userSelectEmpty');
+    const userSelectList = document.getElementById('userSelectList');
+    const userSelectBarangayName = document.getElementById('userSelectBarangayName');
+    const userSelectConfirmBtn = document.getElementById('userSelectConfirmBtn');
+
+    let selectedBnsUserId = null;
+    let selectedBnsUserName = '';
+
+    function showUserSelectState(state) {
+        [userSelectLoading, userSelectEmpty, userSelectList].forEach(el => {
+            if (el) el.classList.add('hidden');
+        });
+        if (state === 'loading' && userSelectLoading) userSelectLoading.classList.remove('hidden');
+        if (state === 'empty' && userSelectEmpty) { userSelectEmpty.classList.remove('hidden'); userSelectEmpty.style.display = 'flex'; }
+        if (state === 'list' && userSelectList) userSelectList.classList.remove('hidden');
+    }
+
+    function selectUser(userId, userName) {
+        selectedBnsUserId = userId;
+        selectedBnsUserName = userName;
+
+        if (userSelectList) {
+            userSelectList.querySelectorAll('.us-user-card').forEach(card => {
+                const isSelected = parseInt(card.dataset.userId, 10) === userId;
+                card.classList.toggle('ring-2', isSelected);
+                card.classList.toggle('ring-blue-400', isSelected);
+                card.classList.toggle('bg-blue-50/50', isSelected);
+                card.classList.toggle('border-blue-300', isSelected);
+                card.classList.toggle('bg-white', !isSelected);
+                card.classList.toggle('border-slate-200', !isSelected);
+                const check = card.querySelector('.us-check');
+                if (check) check.classList.toggle('hidden', !isSelected);
+            });
+        }
+
+        if (userSelectConfirmBtn) userSelectConfirmBtn.disabled = false;
+    }
+
+    function buildUserCard(user) {
+        const roleColor = 'bg-blue-50 text-blue-600 border border-blue-100/50';
+        const roleShort = (user.role || 'BNS').toUpperCase();
+
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.dataset.userId = user.user_id;
+        card.className = [
+            'us-user-card w-full flex items-center gap-3 rounded-xl border border-slate-200',
+            'bg-white px-4 py-3 text-left transition-all duration-200 ease-out',
+            'hover:border-blue-300 hover:bg-blue-50/30 focus:outline-none focus:ring-2 focus:ring-blue-200 shadow-sm'
+        ].join(' ');
+
+        card.innerHTML = `
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-50 to-blue-100 text-blue-600 font-bold text-[0.82rem] shadow-inner ring-1 ring-blue-200/50">
+                ${String(user.full_name).split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="text-[0.84rem] font-bold text-slate-800 truncate">${String(user.full_name).replace(/[&<>"']/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s]))}</div>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                     <span class="inline-block rounded-md px-1.5 py-0.5 text-[0.62rem] font-bold tracking-wider ${roleColor}">${roleShort}</span>
+                </div>
+            </div>
+            <div class="us-check hidden shrink-0 h-5 w-5 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-md">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+        `;
+
+        card.addEventListener('click', () => selectUser(user.user_id, user.full_name));
+        return card;
+    }
+
+    async function openUserSelectModal() {
+        selectedBnsUserId = null;
+        selectedBnsUserName = '';
+        if (userSelectConfirmBtn) userSelectConfirmBtn.disabled = true;
+        if (userSelectList) userSelectList.innerHTML = '';
+
+        const brSel = document.getElementById('edit_barangay_id');
+        const brText = brSel && brSel.value ? brSel.options[brSel.selectedIndex].text : '—';
+        const brId = brSel ? parseInt(brSel.value, 10) : 0;
+        if (userSelectBarangayName) userSelectBarangayName.textContent = brText;
+
+        userSelectModal.classList.remove('opacity-0', 'invisible', 'pointer-events-none');
+        userSelectModal.classList.add('opacity-100', 'visible', 'pointer-events-auto');
+        if (userSelectBox) {
+            userSelectBox.classList.remove('translate-y-4', 'scale-95');
+            userSelectBox.classList.add('translate-y-0', 'scale-100');
+        }
+        userSelectModal.setAttribute('aria-hidden', 'false');
+
+        showUserSelectState('loading');
+
+        try {
+            const fd = new FormData();
+            fd.append('action', 'get_barangay_users');
+            fd.append('barangay_id', brId);
+            const res = await fetch('add_profile.php', { method: 'POST', body: fd });
+            const json = await res.json();
+
+            if (!json || !json.success || !Array.isArray(json.users) || json.users.length === 0) {
+                showUserSelectState('empty');
+                return;
+            }
+
+            json.users.forEach(user => {
+                if (userSelectList) userSelectList.appendChild(buildUserCard(user));
+            });
+            showUserSelectState('list');
+        } catch (err) {
+            console.error('Failed to fetch barangay users:', err);
+            showUserSelectState('empty');
+        }
+    }
+
+    function closeUserSelectModal() {
+        userSelectModal.classList.add('opacity-0', 'invisible', 'pointer-events-none');
+        userSelectModal.classList.remove('opacity-100', 'visible', 'pointer-events-auto');
+        if (userSelectBox) {
+            userSelectBox.classList.add('translate-y-4', 'scale-95');
+            userSelectBox.classList.remove('translate-y-0', 'scale-100');
+        }
+        userSelectModal.setAttribute('aria-hidden', 'true');
+    }
+
     // ── Event Listeners ──
     inputMeasurementDate.addEventListener('change', calculateAge);
     inputHeight.addEventListener('input', updateStatusPreview);
@@ -326,6 +524,95 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnUpdateCancel.addEventListener('click', closeUpdateModal);
     updateModalBackdrop.addEventListener('click', closeUpdateModal);
+
+    const editBarangaySelect = document.getElementById('edit_barangay_id');
+    if (editBarangaySelect) {
+        editBarangaySelect.addEventListener('change', () => {
+            const barangayId = editBarangaySelect.value;
+            const hiddenEditBarangayInput = document.getElementById('hidden_edit_barangay_id');
+            if (hiddenEditBarangayInput) {
+                hiddenEditBarangayInput.value = barangayId;
+            }
+
+            const editDesignatedUserIdInput = document.getElementById('edit_designated_user_id');
+            const editDesignatedUserNameInput = document.getElementById('edit_designated_user_name');
+
+            if (barangayId && parseInt(barangayId, 10) === parseInt(originalBarangayId, 10)) {
+                // Restore original BNS
+                if (editDesignatedUserIdInput) {
+                    editDesignatedUserIdInput.value = originalBnsUserId || '';
+                }
+                if (editDesignatedUserNameInput) {
+                    editDesignatedUserNameInput.value = originalBnsUserName || 'No BNS Assigned';
+                }
+            } else {
+                // Clear current BNS selection
+                if (editDesignatedUserIdInput) {
+                    editDesignatedUserIdInput.value = '';
+                }
+                if (editDesignatedUserNameInput) {
+                    editDesignatedUserNameInput.value = 'No BNS Assigned';
+                }
+                // Automatically open selector pop-up for the new barangay if a barangay is selected
+                if (barangayId) {
+                    openUserSelectModal();
+                }
+            }
+            checkFormChanges();
+        });
+    }
+
+    const btnChangeBns = document.getElementById('btn_change_bns');
+    if (btnChangeBns) {
+        btnChangeBns.addEventListener('click', () => {
+            const editBarangaySelect = document.getElementById('edit_barangay_id');
+            if (!editBarangaySelect || !editBarangaySelect.value) {
+                alert('Please select a Barangay first.');
+                return;
+            }
+            openUserSelectModal();
+        });
+    }
+
+    const userSelectBackBtn = document.getElementById('userSelectBackBtn');
+    if (userSelectBackBtn) {
+        userSelectBackBtn.addEventListener('click', closeUserSelectModal);
+    }
+
+    const userSelectBackdrop = document.getElementById('userSelectBackdrop');
+    if (userSelectBackdrop) {
+        userSelectBackdrop.addEventListener('click', closeUserSelectModal);
+    }
+
+    if (userSelectConfirmBtn) {
+        userSelectConfirmBtn.addEventListener('click', () => {
+            if (!selectedBnsUserId) return;
+            const editDesignatedUserIdInput = document.getElementById('edit_designated_user_id');
+            const editDesignatedUserNameInput = document.getElementById('edit_designated_user_name');
+            if (editDesignatedUserIdInput) {
+                editDesignatedUserIdInput.value = selectedBnsUserId;
+            }
+            if (editDesignatedUserNameInput) {
+                editDesignatedUserNameInput.value = selectedBnsUserName;
+            }
+            closeUserSelectModal();
+            checkFormChanges();
+        });
+    }
+
+    if (updateForm) {
+        updateForm.addEventListener('input', checkFormChanges);
+        updateForm.addEventListener('change', checkFormChanges);
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            const modal = document.getElementById('userSelectModal');
+            if (modal && !modal.classList.contains('invisible')) {
+                closeUserSelectModal();
+            }
+        }
+    });
 
     // ── Form Submission ──
     updateForm.addEventListener('submit', function (e) {
@@ -341,6 +628,19 @@ document.addEventListener('DOMContentLoaded', () => {
             inputHeight.required = false;
             inputWeight.required = false;
             inputMuac.required = false;
+
+            const editBarangaySelect = document.getElementById('edit_barangay_id');
+            const currentBarangayId = editBarangaySelect ? editBarangaySelect.value : '';
+
+            // ONLY required if the child's barangay has changed
+            if (currentBarangayId && parseInt(currentBarangayId, 10) !== parseInt(originalBarangayId, 10)) {
+                const editDesignatedUserIdInput = document.getElementById('edit_designated_user_id');
+                if (editDesignatedUserIdInput && !editDesignatedUserIdInput.value) {
+                    showToast('error', 'Assigned Barangay Nutrition Scholar (BNS) is required when changing Barangay.');
+                    openUserSelectModal();
+                    return;
+                }
+            }
         } else if (mode === 'measurement') {
             document.getElementById('edit_first_name').required = false;
             document.getElementById('edit_last_name').required = false;
@@ -382,6 +682,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     closeUpdateModal();
                     btnUpdateSave.disabled = false;
                     btnUpdateSave.classList.remove('opacity-70');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
                 } else {
                     updateModalMessage.innerHTML = '';
                     showToast('error', json.message || 'Unable to save changes.');
@@ -531,7 +834,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Pre-populate filters from URL query parameters on load
     function initFiltersFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
-        
+
         const paramSearch = urlParams.get('search') || urlParams.get('query');
         const paramSex = urlParams.get('sex');
         const paramIp = urlParams.get('ip');
@@ -548,7 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (paramSearch && searchInput) { searchInput.value = paramSearch; hasActiveFilters = true; }
         if (paramSex && sexFilter) { sexFilter.value = paramSex.toLowerCase(); hasActiveFilters = true; }
         if (paramIp && ipFilter) { ipFilter.value = paramIp.toLowerCase(); hasActiveFilters = true; }
-        
+
         if (barangayFilter) {
             if (paramBarangayId) {
                 const opt = Array.from(barangayFilter.options).find(o => o.value.includes(paramBarangayId.toLowerCase()));
@@ -598,6 +901,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearSuccessBackdrop = document.getElementById('clearSuccessBackdrop');
     const btnClearSuccessOk = document.getElementById('btnClearSuccessOk');
 
+    const actionBlockedModal = document.getElementById('actionBlockedModal');
+    const actionBlockedBox = document.getElementById('actionBlockedBox');
+    const actionBlockedBackdrop = document.getElementById('actionBlockedBackdrop');
+    const btnActionBlockedOk = document.getElementById('btnActionBlockedOk');
+
     function openClearModal() {
         clearConfirmModal.classList.remove('invisible', 'pointer-events-none');
         clearConfirmModal.classList.add('opacity-100');
@@ -623,8 +931,35 @@ document.addEventListener('DOMContentLoaded', () => {
         clearSuccessBox.classList.add('translate-y-0', 'scale-100');
     }
 
+    function openActionBlockedModal() {
+        actionBlockedModal.classList.remove('invisible', 'pointer-events-none');
+        actionBlockedModal.classList.add('opacity-100');
+        actionBlockedBox.classList.remove('translate-y-4', 'scale-95');
+        actionBlockedBox.classList.add('translate-y-0', 'scale-100');
+    }
+
+    function closeActionBlockedModal() {
+        actionBlockedModal.classList.add('opacity-0');
+        actionBlockedBox.classList.add('translate-y-4', 'scale-95');
+        actionBlockedBox.classList.remove('translate-y-0', 'scale-100');
+        setTimeout(() => {
+            actionBlockedModal.classList.add('invisible', 'pointer-events-none');
+            actionBlockedModal.classList.remove('opacity-100');
+        }, 200);
+    }
+
+    if (btnActionBlockedOk) btnActionBlockedOk.addEventListener('click', closeActionBlockedModal);
+    if (actionBlockedBackdrop) actionBlockedBackdrop.addEventListener('click', closeActionBlockedModal);
+
     if (btnClearAll) {
-        btnClearAll.addEventListener('click', openClearModal);
+        btnClearAll.addEventListener('click', () => {
+            const isBlocked = btnClearAll.getAttribute('data-blocked') === 'true';
+            if (isBlocked) {
+                openActionBlockedModal();
+            } else {
+                openClearModal();
+            }
+        });
     }
 
     if (btnCancelClear) btnCancelClear.addEventListener('click', closeClearModal);

@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', function () {
     const hasRecords = Array.isArray(window.childRecords) && window.childRecords.length > 0;
+    const isCompactViewport = window.matchMedia('(max-width: 768px)').matches;
+    const chartTickFontSize = isCompactViewport ? 9 : 11;
+    const chartTitleFontSize = isCompactViewport ? 10 : 11;
 
     const records = hasRecords ? window.childRecords.slice().reverse() : [];
     const eccdRefs = window.eccdRefs || {};
@@ -23,26 +26,27 @@ document.addEventListener('DOMContentLoaded', function () {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { display: false }, tooltip: {
+            legend: { display: false },
+            tooltip: {
                 backgroundColor: '#0f172a',
                 titleColor: '#94a3b8',
                 bodyColor: '#f8fafc',
                 padding: 10,
                 cornerRadius: 8,
-                titleFont: { family: 'Arial', size: 11 },
-                bodyFont: { family: 'Arial', size: 13, weight: '600' }
+                titleFont: { family: 'Arial', size: chartTickFontSize },
+                bodyFont: { family: 'Arial', size: chartTickFontSize + 2, weight: '600' }
             }
         },
         scales: {
             x: {
                 grid: { color: '#d1d5db', drawBorder: true, lineWidth: 0.6, drawTicks: true },
                 border: { color: '#1f2937' },
-                ticks: { color: '#111827', font: { size: 11, family: 'Arial' }, autoSkip: false }
+                ticks: { color: '#111827', font: { size: chartTickFontSize, family: 'Arial' }, autoSkip: false }
             },
             y: {
                 grid: { color: '#d1d5db', drawBorder: true },
                 border: { color: '#1f2937' },
-                ticks: { color: '#111827', font: { size: 11, family: 'Arial' } },
+                ticks: { color: '#111827', font: { size: chartTickFontSize, family: 'Arial' } },
                 beginAtZero: false
             }
         }
@@ -93,14 +97,14 @@ document.addEventListener('DOMContentLoaded', function () {
                         max: xMax === null ? undefined : xMax,
                         ticks: {
                             color: '#111827',
-                            font: { size: 11, family: 'Arial' },
+                            font: { size: chartTickFontSize, family: 'Arial' },
                             stepSize: xStep === null ? undefined : xStep,
                             autoSkip: false,
                             callback: xTickCallback === null ? undefined : xTickCallback,
                             maxRotation: 0,
                             minRotation: 0
                         },
-                        title: { display: true, text: xTitle, color: '#111827', font: { size: 11, family: 'Arial', weight: '600' } }
+                        title: { display: true, text: xTitle, color: '#111827', font: { size: chartTitleFontSize, family: 'Arial', weight: '600' } }
                     },
                     y: {
                         grid: { color: '#d1d5db', drawBorder: true },
@@ -109,12 +113,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         max: yMax === null ? undefined : yMax,
                         ticks: {
                             color: '#111827',
-                            font: { size: 11, family: 'Arial' },
+                            font: { size: chartTickFontSize, family: 'Arial' },
                             stepSize: yStep === null ? undefined : yStep,
                             callback: yTickCallback === null ? undefined : yTickCallback,
                             autoSkip: yAutoSkip === null ? undefined : yAutoSkip
                         },
-                        title: { display: true, text: yTitle, color: '#111827', font: { size: 11, family: 'Arial', weight: '600' } }
+                        title: { display: true, text: yTitle, color: '#111827', font: { size: chartTitleFontSize, family: 'Arial', weight: '600' } }
                     }
                 }
             }
@@ -137,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Normal (Upper)', data: toPoints(wfaRef, 'age_month', 'normal_max'), borderColor: '#38bdf8', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Overweight', data: toPoints(wfaRef, 'age_month', 'overweight', true), borderColor: '#0ea5e9', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Child', data: wfaChild, borderColor: childLineColor, backgroundColor: childLineColor, borderWidth: 2.4, pointRadius: 3, pointHoverRadius: 6, tension: 0.15 }
-        ], 'Age (months)', 'Weight (kg)', 0, 59, 1, null, 1, 25, 1);
+        ], 'Age (months)', 'Weight (kg)', 0, 59, isCompactViewport ? 6 : 1, null, 1, 25, isCompactViewport ? 2 : 1);
     }
 
     if (hasRecords && hfaRef.length) {
@@ -147,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Normal (Upper)', data: toPoints(hfaRef, 'age_month', 'normal_to'), borderColor: '#38bdf8', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Tall', data: toPoints(hfaRef, 'age_month', 'tall'), borderColor: '#0ea5e9', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Child', data: hfaChild, borderColor: childLineColor, backgroundColor: childLineColor, borderWidth: 2.4, pointRadius: 3, pointHoverRadius: 6, tension: 0.15 }
-        ], 'Age (months)', 'Height (cm)', 0, 59, 1, null, 43, 119, 1);
+        ], 'Age (months)', 'Height (cm)', 0, 59, isCompactViewport ? 6 : 1, null, 43, 119, isCompactViewport ? 4 : 1);
     }
 
     if (hasRecords && wflRef.length) {
@@ -171,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Overweight', data: toPoints(wflRef, 'length_cm', 'overweight_to'), borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 1.8, pointRadius: 0, tension: 0.25 },
             { label: 'Obese', data: toPoints(wflRef, 'length_cm', 'obese'), borderColor: '#f87171', backgroundColor: 'transparent', borderWidth: 1.8, pointRadius: 0, tension: 0.25 },
             { label: 'Child', data: wflChild, borderColor: childLineColor, backgroundColor: childLineColor, borderWidth: 2.4, pointRadius: 3, pointHoverRadius: 6, tension: 0.15 }
-        ], 'Length/Height (cm)', 'Weight (kg)', 65, 120, 1, wflXLabel, 1, 34, 1, wflTickLabel, false);
+        ], 'Length/Height (cm)', 'Weight (kg)', 65, 120, isCompactViewport ? 5 : 1, wflXLabel, 1, 34, isCompactViewport ? 2 : 1, wflTickLabel, false);
     }
 
     const bindModal = (openId, modalId, closeId, backdropId) => {

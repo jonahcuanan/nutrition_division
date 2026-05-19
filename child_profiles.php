@@ -144,11 +144,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_child_profile') {
         exit;
     }
 
-    $sqlProfile = "SELECT c.child_id, c.first_name, c.last_name, c.birthdate, c.sex, c.address, c.is_ip,
+    $sqlProfile = "SELECT c.child_id, c.first_name, c.last_name, c.birthdate, c.sex, c.address, c.is_ip, c.barangay_id,
                       g.first_name AS guardian_first, g.last_name AS guardian_last,
                       gr.record_id, gr.measurement_date, gr.weight, gr.height,
                       gr.muac_measurement, gr.muac_id,
-                      gr.weight_id, gr.height_id, gr.wfl_id, gr.recorded_by
+                      gr.weight_id, gr.height_id, gr.wfl_id, gr.recorded_by,
+                      u.first_name AS bns_first_name, u.last_name AS bns_last_name
                   FROM children c
                   LEFT JOIN guardians g ON c.guardian_id = g.guardian_id
                   LEFT JOIN growth_records gr ON gr.record_id = (
@@ -158,6 +159,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_child_profile') {
                       ORDER BY gr2.measurement_date DESC, gr2.record_id DESC 
                       LIMIT 1
                   )
+                  LEFT JOIN users u ON gr.recorded_by = u.user_id
                   WHERE c.child_id = ?
                   LIMIT 1";
 
@@ -287,9 +289,35 @@ if (isset($_GET['action']) && $_GET['action'] === 'compute_status') {
 }
 
 // Read the cutoff record_id set by "New Measurement Period"
-$cutoffRecordId = file_exists(__DIR__ . '/measurement_session.txt')
-    ? (int)trim(file_get_contents(__DIR__ . '/measurement_session.txt'))
+$sessionFile = __DIR__ . '/measurement_session.txt';
+$cutoffRecordId = file_exists($sessionFile)
+    ? (int)trim(file_get_contents($sessionFile))
     : 0;
+
+// Only treat the cutoff as active if the session file is from the current month
+// and a clear_measurements activity exists in the current month.
+$periodIsNew = false;
+if (file_exists($sessionFile)) {
+    clearstatcache(true, $sessionFile);
+    $mtime = filemtime($sessionFile);
+    if (date('Y-m', $mtime) === date('Y-m')) {
+        $hasClearThisMonth = false;
+        if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
+            $clearSql = "SELECT 1 FROM user_activity_log WHERE activity_type = 'clear_measurements' AND DATE_FORMAT(activity_time, '%Y-%m') = DATE_FORMAT(CURRENT_DATE, '%Y-%m') LIMIT 1";
+            if ($clearRes = $conn->query($clearSql)) {
+                $hasClearThisMonth = ($clearRes->num_rows > 0);
+            }
+        }
+
+        if ($hasClearThisMonth) {
+            $periodIsNew = true;
+        } else {
+            $cutoffRecordId = 0;
+        }
+    } else {
+        $cutoffRecordId = 0;
+    }
+}
 
 // Safeguard: If the cutoff is greater than the max record_id, the database was likely reset.
 if ($cutoffRecordId > 0 && isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
@@ -303,16 +331,6 @@ if ($cutoffRecordId > 0 && isset($conn) && $conn instanceof mysqli && $conn->con
     }
 }
 
-// Check if a new measurement period can be started (only once per calendar month)
-$sessionFile = __DIR__ . '/measurement_session.txt';
-$canStartNewPeriod = true;
-if (file_exists($sessionFile)) {
-    clearstatcache(true, $sessionFile);
-    $mtime = filemtime($sessionFile);
-    if (date('Y-m', $mtime) === date('Y-m')) {
-        $canStartNewPeriod = false;
-    }
-}
 
 $baseSql = 'SELECT c.*, b.barangay_name, g.first_name AS guardian_first, g.last_name AS guardian_last,
             gr.record_id AS latest_record_id, gr.height AS latest_height, gr.weight AS latest_weight,
@@ -339,12 +357,14 @@ $baseSql = 'SELECT c.*, b.barangay_name, g.first_name AS guardian_first, g.last_
 
 if ($getMonthFrom > 0 && $getMonthTo > 0) $baseSql .= " AND MONTH(gr2.measurement_date) BETWEEN $getMonthFrom AND $getMonthTo";
 if ($getYear > 0) $baseSql .= " AND YEAR(gr2.measurement_date) = $getYear";
-if ($cutoffRecordId > 0) $baseSql .= " AND gr2.record_id > $cutoffRecordId";
 
-$baseSql .= '
-        ORDER BY gr2.measurement_date DESC, gr2.record_id DESC
-        LIMIT 1
-    )';
+$hasDateFilter = ($getMonthFrom > 0 || $getYear > 0);
+
+if (!$hasDateFilter && $cutoffRecordId > 0) {
+    $baseSql .= "\n        ORDER BY (gr2.record_id > $cutoffRecordId) DESC, gr2.measurement_date DESC, gr2.record_id DESC\n        LIMIT 1\n    )";
+} else {
+    $baseSql .= "\n        ORDER BY gr2.measurement_date DESC, gr2.record_id DESC\n        LIMIT 1\n    )";
+}
 
 $whereClauses = ["c.status = 'Active'"];
 $bindParams = [];
@@ -412,6 +432,14 @@ if ($result && $result->num_rows > 0) {
         $row['latest_wflh'] = '—';
         $row['latest_muac_status'] = '—';
         $row['latest_age_months'] = $row['age_in_months'] ?? null;
+
+        if (!$hasDateFilter && $cutoffRecordId > 0 && $row['latest_record_id'] <= $cutoffRecordId) {
+            $row['latest_measurement_date'] = null;
+            $row['latest_height'] = null;
+            $row['latest_weight'] = null;
+            $row['latest_muac'] = null;
+            $row['latest_record_id'] = null;
+        }
 
         if (!empty($row['latest_measurement_date']) && !empty($row['birthdate'])) {
             $latestAgeMonths = null;
@@ -546,6 +574,15 @@ $printCity = $barangayInfo['city'] ?? '__________';
 $printProvince = $barangayInfo['province'] ?? '__________';
 $hidePrintBarangayColumnDefault = ($getBarangayId > 0) || ($getBarangayName !== '') || ($isHw && $assignedBarangayId > 0);
 $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
+
+$barangaysQuery = $conn->query('SELECT barangay_id, barangay_name FROM barangays ORDER BY barangay_name ASC');
+$barangaysList = [];
+if ($barangaysQuery) {
+    while ($b = $barangaysQuery->fetch_assoc()) {
+        $barangaysList[] = $b;
+    }
+}
+$limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health Worker'], true);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -573,6 +610,14 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
 
         #updateModalMessage {
             display: none;
+        }
+
+        /* Smaller modal when in Edit Profile mode */
+        #updateModalBox.modal--profile {
+            max-width: 36rem;
+        }
+        #updateModalBox.modal--profile .max-h-\[78vh\] {
+            max-height: 72vh;
         }
 
         #toastContainer {
@@ -707,7 +752,10 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
                 Print
             </button>
             <?php if (!$isBns && !$isHw): ?>
-            <button type="button" id="btnGeneralClearMeasurements" data-unmeasured="<?= $unmeasuredCount ?>" <?= !$canStartNewPeriod ? 'disabled title="A new measurement period has already been started this month."' : '' ?> class="inline-flex items-center gap-2 rounded-md border <?= $canStartNewPeriod ? 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100' : 'border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed' ?> px-3 py-2 text-[0.8rem] font-semibold shadow-sm transition-colors">
+            <?php 
+                $disableNewPeriod = ($cutoffRecordId > 0 && $unmeasuredCount > 0);
+            ?>
+            <button type="button" id="btnGeneralClearMeasurements" data-unmeasured="<?= $unmeasuredCount ?>" data-blocked="<?= $disableNewPeriod ? 'true' : 'false' ?>" class="inline-flex items-center gap-2 rounded-md border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 px-3 py-2 text-[0.8rem] font-semibold shadow-sm transition-colors">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
                 New Measurement Period
             </button>
@@ -798,7 +846,7 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
                 <div class="print-note">For a maximum of 1000 children in a small or medium sized barangay. For large barangays, use this file for a purok, section, or part of the barangay.</div>
             </div>
         </div>
-        <div class="print-band print-band-theme px-[6px] py-[2px] font-bold uppercase">
+        <div class="print-band print-band-theme px-[6px] py-[2px] font-bold uppercase" style="margin-top: -45px;">
             <span class="print-band-spacer"></span>
             <span class="print-band-center">WEIGHT FOR AGE, HEIGHT FOR AGE, &amp; WEIGHT FOR LENGTH/HEIGHT STATUS</span>
             <span class="print-band-right">Region: CARAGA</span>
@@ -835,36 +883,36 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
             </colgroup>
             <thead>
                 <tr>
-                    <th rowspan="2" class="print-center bg-[#000000] text-white">Child Seq.</th>
-                    <th rowspan="2" class="print-center print-h11 bg-[#000000] text-white">Address or Location
+                    <th rowspan="2" class="print-center bg-white text-black border border-black">Child Seq.</th>
+                    <th rowspan="2" class="print-center print-h11 bg-white text-black border border-black">Address or Location
                         <span class="print-subhead print-subhead-lg">of Child's Residence</span>
                         <span class="print-th-subnote">(if Purok, Area or Location in the Barangay)</span>
                     </th>
-                    <th rowspan="2" class="print-center print-h11 bg-[#000000] text-white print-barangay-col">Barangay</th>
-                    <th rowspan="2" class="print-center print-h11 bg-[#000000] text-white">Name of Mother 
+                    <th rowspan="2" class="print-center print-h11 bg-white text-black border border-black print-barangay-col">Barangay</th>
+                    <th rowspan="2" class="print-center print-h11 bg-white text-black border border-black">Name of Mother 
                         <span class="print-subhead print-subhead-lg">(Last Name, First Name)</span>
                     </th>
-                    <th rowspan="2" class="print-center print-h11 bg-[#000000] text-white">Full Name of Child
+                    <th rowspan="2" class="print-center print-h11 bg-white text-black border border-black">Full Name of Child
                         <span class="print-th-subnote">(Last Name, First Name)</span>
                     </th>
-                    <th rowspan="2" class="print-center print-h10 bg-[#000000] text-white">Belongs to a<br>Group?
+                    <th rowspan="2" class="print-center print-h10 bg-white text-black border border-black">Belongs to a<br>Group?
                         <span class="print-subhead print-subhead-md print-upper">YES/NO</span>
                     </th>
-                    <th rowspan="2" class="print-center bg-[#000000] text-white">Sex<br><span class="print-subhead">M/F</span></th>
-                    <th colspan="2" class="print-th-note print-center print-note-bg">MEASUREMENT INFORMATION AT FORMAL<br>ENTRY: PLS READ</th>
-                    <th rowspan="2" class="print-center print-h11 print-weight-height-bg">Weight<br>(kg)</th>
-                    <th rowspan="2" class="print-center print-h11 print-weight-height-bg">Height<br>(cm)</th>
-                    <th colspan="6" class="print-th-status-note print-center print-status-note-bg">NO DATA ENTRY REQUIRED -<br>AUTOMATIC RESULTS CALCULATION</th>
+                    <th rowspan="2" class="print-center bg-white text-black border border-black">Sex<br><span class="print-subhead">M/F</span></th>
+                    <th colspan="2" class="print-th-note print-center border border-black" style="background-color: #c0392b !important; color: #ffffff;">MEASUREMENT INFORMATION AT FORMAL<br>ENTRY: PLS READ</th>
+                    <th rowspan="2" class="print-center print-h11 bg-white text-black border border-black">Weight<br>(kg)</th>
+                    <th rowspan="2" class="print-center print-h11 bg-white text-black border border-black">Height<br>(cm)</th>
+                    <th colspan="6" class="print-th-status-note print-center border border-black" style="background-color: #c0392b !important; color: #ffffff;">NO DATA ENTRY REQUIRED -<br>AUTOMATIC RESULTS CALCULATION</th>
                 </tr>
                 <tr>
-                    <th class="print-center print-h11 bg-[#000000] text-white">Date of Birth</th>
-                    <th class="print-center print-h11 bg-[#000000] text-white print-nowrap">Date Measured</th>
-                    <th class="print-center print-h11 print-age-weight-bg age-months">Age in Months</th>
-                    <th class="print-center print-h11 print-age-weight-bg">Weight for<br>Age Status</th>
-                    <th class="print-center print-h11 print-age-weight-bg">Height for Age<br>Status</th>
-                    <th class="print-center print-h11 print-age-weight-bg">Weight for<br>L/HT Status</th>
-                    <th class="print-center print-h11 print-age-weight-bg">MUAC<br>(cm)</th>
-                    <th class="print-center print-h11 print-age-weight-bg">MUAC<br>Status</th>
+                    <th class="print-center print-h11 bg-white text-black border border-black">Date of Birth</th>
+                    <th class="print-center print-h11 bg-white text-black border border-black print-nowrap">Date Measured</th>
+                    <th class="print-center print-h11 bg-white text-black border border-black age-months">Age in Months</th>
+                    <th class="print-center print-h11 bg-white text-black border border-black">Weight for<br>Age Status</th>
+                    <th class="print-center print-h11 bg-white text-black border border-black">Height for Age<br>Status</th>
+                    <th class="print-center print-h11 bg-white text-black border border-black">Weight for<br>L/HT Status</th>
+                    <th class="print-center print-h11 bg-white text-black border border-black">MUAC<br>(cm)</th>
+                    <th class="print-center print-h11 bg-white text-black border border-black">MUAC<br>Status</th>
                 </tr>
             </thead>
             <tbody id="printTableBody">
@@ -1011,18 +1059,18 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
         <table class="table-stack min-w-full border border-slate-300 text-left text-[0.62rem] leading-tight">
             <thead class="text-[0.68rem] font-semibold uppercase tracking-wide text-white">
                 <tr>
-                    <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 align-middle">Address / Location</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 align-middle">Address / Location</th>
                     <?php if ($isAdmin): ?>
-                        <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 align-middle">Barangay</th>
+                        <th class="border border-slate-300 bg-black px-2 py-1.5 align-middle">Barangay</th>
                     <?php endif; ?>
-                    <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 align-middle">Mother / Caregiver</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 align-middle">Full Name of Child</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 text-center align-middle">Belongs to IP Group?</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 text-center align-middle">Sex</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 text-center align-middle">Date of Birth</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 text-center align-middle">Date Measured</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 text-center align-middle">Weight (kg)</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-2 py-1.5 text-center align-middle">Height (cm)</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 align-middle">Mother / Caregiver</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 align-middle">Full Name of Child</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Belongs to IP Group?</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Sex</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Date of Birth</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Date Measured</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Weight (kg)</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Height (cm)</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle age-months">Age (months)</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Height for Age Status</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Weight for Age Status</th>
@@ -1087,6 +1135,7 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
                     if ($addressDisplay === '') {
                         $addressDisplay = $row['barangay_name'] ?? '—';
                     }
+                    $barangayDisplay = $row['barangay_name'] ?? '—';
                     $guardianDisplay = trim((string)($row['guardian_first'] . ' ' . $row['guardian_last']));
                     $guardianDisplay = $guardianDisplay !== '' ? $guardianDisplay : '—';
                     $sexDisplay = $row['sex'] === 'Male' ? 'M' : ($row['sex'] === 'Female' ? 'F' : '—');
@@ -1126,7 +1175,7 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
                     data-middle-name="<?= htmlspecialchars($row['middle_name'] ?? '') ?>"
                     data-last-name="<?= htmlspecialchars($row['last_name']) ?>"
                     data-suffix="<?= htmlspecialchars($row['suffix'] ?? '') ?>"
-                    data-barangay="<?= strtolower(htmlspecialchars($row['barangay_name'] ?? '')) ?>"
+                    data-barangay="<?= strtolower(htmlspecialchars($barangayDisplay)) ?>"
                     data-guardian="<?= strtolower(htmlspecialchars($guardianDisplay)) ?>"
                     data-guardian-first="<?= htmlspecialchars($row['guardian_first']) ?>"
                     data-guardian-last="<?= htmlspecialchars($row['guardian_last']) ?>"
@@ -1202,19 +1251,12 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
                                     <svg class="shrink-0 opacity-90" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                                     View
                                 </a>
-                                <?php 
-                                    $measCount = (int)($row['month_measurement_count'] ?? 0);
-                                    $muacCount = (int)($row['month_muac_count'] ?? 0);
-                                    $isMeasLimitReached = ($measCount >= 2);
-                                    $isMuacLimitReached = ($muacCount >= 2);
-                                    $hasNoRecordAtAll = empty($row['absolute_latest_record_id']);
-                                ?>
-                                <button type="button" class="btn-open-update flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[0.78rem] font-semibold text-blue-700 hover:bg-blue-50 <?= $isMeasLimitReached ? 'opacity-40 cursor-not-allowed' : '' ?>" data-child-id="<?= (int)$row['child_id'] ?>" data-mode="measurement" <?= $isMeasLimitReached ? 'disabled title="Strict monthly limit of 2 measurements reached"' : '' ?>>
+                                <button type="button" class="btn-open-update flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[0.78rem] font-semibold text-blue-700 hover:bg-blue-50" data-child-id="<?= (int)$row['child_id'] ?>" data-mode="measurement">
                                     <svg class="shrink-0 opacity-90" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/><path d="M14.06 6.19l1.77-1.77a1.5 1.5 0 1 1 2.12 2.12l-1.77 1.77"/></svg>
                                     Update Measurement
                                 </button>
                                 <?php if ($currentAgeMonths !== null && $currentAgeMonths >= 6 && $currentAgeMonths <= 59): ?>
-                                <button type="button" class="btn-open-update flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[0.78rem] font-semibold text-emerald-700 hover:bg-emerald-50 <?= ($hasNoRecordAtAll || $isMuacLimitReached) ? 'opacity-40 cursor-not-allowed' : '' ?>" data-child-id="<?= (int)$row['child_id'] ?>" data-mode="muac" <?= $hasNoRecordAtAll ? 'disabled title="Please update measurement (Height/Weight) first before adding MUAC"' : ($isMuacLimitReached ? 'disabled title="Strict monthly limit of 2 MUAC updates reached"' : '') ?>>
+                                <button type="button" class="btn-open-update flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[0.78rem] font-semibold text-emerald-700 hover:bg-emerald-50" data-child-id="<?= (int)$row['child_id'] ?>" data-mode="muac">
                                     <svg class="shrink-0 opacity-90" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     Update MUAC
                                 </button>
@@ -1303,6 +1345,26 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Address / Location</label>
                                 <input type="text" name="address" id="edit_address" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
+                             <div class="flex flex-col gap-1 text-[0.78rem] sm:col-span-2">
+                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Barangay <span class="text-rose-500">*</span></label>
+                                 <select name="barangay_id" id="edit_barangay_id" required class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100 bg-white" <?= $limit_barangay ? 'disabled' : '' ?>>
+                                     <option value="">Select barangay</option>
+                                     <?php foreach ($barangaysList as $b): ?>
+                                         <option value="<?= htmlspecialchars($b['barangay_id']) ?>"><?= htmlspecialchars($b['barangay_name']) ?></option>
+                                     <?php endforeach; ?>
+                                 </select>
+                                 <?php if ($limit_barangay): ?>
+                                     <input type="hidden" name="barangay_id" id="hidden_edit_barangay_id" value="" />
+                                 <?php endif; ?>
+                             </div>
+                             <div class="flex flex-col gap-1 text-[0.78rem] sm:col-span-2">
+                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Assigned Barangay Nutrition Scholar (BNS)</label>
+                                 <div class="flex items-center gap-2">
+                                     <input type="text" id="edit_designated_user_name" readonly class="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-[0.82rem] text-slate-700 shadow-sm outline-none cursor-default font-medium animate-pulse" placeholder="No BNS Assigned" />
+                                     <button type="button" id="btn_change_bns" class="shrink-0 rounded-md bg-blue-50 px-3 py-1.5 text-[0.82rem] font-bold text-blue-600 border border-blue-200/50 hover:bg-blue-100/70 transition-all focus:outline-none">Change</button>
+                                 </div>
+                                 <input type="hidden" name="designated_user_id" id="edit_designated_user_id" value="" />
+                             </div>
                             <div class="flex flex-col gap-1 text-[0.78rem]">
                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Mother/Caregiver First</label>
                                 <input type="text" name="guardian_first_name" id="edit_g_first" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
@@ -1485,6 +1547,80 @@ $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
             <div class="flex items-center justify-center gap-3 bg-slate-50 px-6 py-4">
                 <button type="button" id="btnClearSuccessOk" class="rounded-lg bg-emerald-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors w-full">OK</button>
             </div>
+        </div>
+    </div>
+    <!-- ══════════════════════════════
+         ACTION BLOCKED MODAL
+    ══════════════════════════════ -->
+    <div class="fixed inset-0 z-[10000] flex items-center justify-center p-5 opacity-0 invisible pointer-events-none transition-opacity duration-200" id="actionBlockedModal" aria-hidden="true">
+        <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-md" id="actionBlockedBackdrop"></div>
+        <div class="relative z-10 w-full max-w-md transform overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.6)] transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] translate-y-4 scale-95" id="actionBlockedBox" role="dialog" aria-modal="true" aria-labelledby="actionBlockedTitle">
+            <div class="h-1.5 bg-rose-500"></div>
+            <div class="px-6 py-8 text-center">
+                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                    <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <h3 class="mb-2 text-lg font-bold text-slate-900" id="actionBlockedTitle">Action Blocked</h3>
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    Action blocked since some children's weight and height were not being updated in the current period.
+                </p>
+            </div>
+            <div class="flex items-center justify-center gap-3 bg-slate-50 px-6 py-4 border-t border-slate-100">
+                <button type="button" id="btnActionBlockedOk" class="rounded-lg bg-rose-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700 transition-colors w-full">Got it</button>
+            </div>
+        </div>
+    </div>
+    <!-- ══════════════════════════════
+         USER SELECTION MODAL (BNS Pop-up)
+    ══════════════════════════════ -->
+    <div class="fixed inset-0 z-[10000] flex items-center justify-center p-5 opacity-0 invisible pointer-events-none transition-opacity duration-200" id="userSelectModal" aria-hidden="true">
+        <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-md" id="userSelectBackdrop"></div>
+        <div class="relative z-10 w-full max-w-md transform overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.6)] transition duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] translate-y-4 scale-95" id="userSelectBox" role="dialog" aria-modal="true" aria-labelledby="userSelectTitle">
+
+            <div class="h-1.5 bg-gradient-to-r from-blue-600 via-blue-500 to-sky-400"></div>
+
+            <div class="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-xl">👤</div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900" id="userSelectTitle">Assign Designated User</h3>
+                    <p class="mt-0.5 text-[0.76rem] text-slate-500">Select the user responsible for this barangay</p>
+                </div>
+            </div>
+
+            <!-- Barangay indicator -->
+            <div class="flex items-center gap-2 bg-blue-50/50 border-b border-blue-100/50 px-5 py-2.5">
+                <span class="text-[0.68rem] font-bold uppercase tracking-wider text-blue-500">Barangay:</span>
+                <span class="text-[0.78rem] font-bold text-blue-800" id="userSelectBarangayName">—</span>
+            </div>
+
+            <div class="px-5 py-5 min-h-[160px]">
+                <!-- Loading state -->
+                <div id="userSelectLoading" class="flex flex-col items-center justify-center py-10 gap-3">
+                    <div class="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-100 border-t-blue-500"></div>
+                    <span class="text-[0.78rem] font-medium text-slate-400">Searching active users…</span>
+                </div>
+
+                <!-- Empty state -->
+                <div id="userSelectEmpty" class="hidden flex-col items-center justify-center py-10 gap-2 text-center">
+                    <div class="text-3xl mb-1 filter grayscale">🔍</div>
+                    <p class="text-[0.82rem] font-bold text-slate-700">No active users found</p>
+                    <p class="text-[0.72rem] text-slate-400 max-w-[220px] leading-relaxed">No Barangay Nutrition Scholar or Health Worker is currently assigned to this barangay.</p>
+                </div>
+
+                <!-- User cards list -->
+                <div id="userSelectList" class="hidden space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar"></div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
+                <button type="button" class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-4 py-2 text-[0.82rem] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50" id="userSelectBackBtn">
+                    Cancel
+                </button>
+                <button type="button" class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-[0.82rem] font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed" id="userSelectConfirmBtn" disabled>
+                    <span class="us-btn-label">✓ Select User</span>
+                    <span class="us-spinner hidden h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                </button>
+            </div>
+
         </div>
     </div>
 

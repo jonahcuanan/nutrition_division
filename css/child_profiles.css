@@ -346,20 +346,20 @@
         /* tighter to shrink overall header height */
         border-top: 1px solid #000000 !important;
         /* keep top edge black */
-        border-left: 1px solid #ffffff !important;
-        /* white left edge */
-        border-right: 1px solid #ffffff !important;
-        /* white right edge */
+        border-left: 1px solid #000000 !important;
+        /* black left edge */
+        border-right: 1px solid #000000 !important;
+        /* black right edge */
         border-bottom: 1px solid #000000 !important;
     }
 
-    /* Force outer edges: first (Child Seq.) left border white, last (Weight for L/HT Status) right border white */
+    /* Force outer edges: first (Child Seq.) left border black, last (MUAC Status) right border black */
     .print-table thead th:first-child {
-        border-left: 1px solid #ffffff !important;
+        border-left: 1px solid #000000 !important;
     }
 
     .print-table thead th:last-child {
-        border-right: 1px solid #ffffff !important;
+        border-right: 1px solid #000000 !important;
     }
 
     .print-left {

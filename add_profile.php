@@ -629,9 +629,9 @@ if ($gResult) while ($g = $gResult->fetch_assoc()) $guardians[] = $g;
                     <!-- Address / Barangay / IP -->
                     <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Complete Address <span class="text-rose-500">*</span></label>
-                            <input type="text" name="address" id="addressField" placeholder="e.g. Purok 3, Sitio Malinis" value="PUROK " required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] uppercase text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400" aria-describedby="addressWarning">
-                            <span id="addressWarning" class="text-[0.68rem] font-semibold text-rose-600 hidden">Add details after Purok (e.g., Purok 3, Sitio).</span>
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Address/Location <span class="text-rose-500">*</span></label>
+                            <input type="text" name="address" id="addressField" placeholder="e.g. Purok 3" value="PUROK " required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] uppercase text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400" aria-describedby="addressWarning">
+                            <span id="addressWarning" class="text-[0.68rem] font-semibold text-rose-600 hidden">Add details after Purok (e.g., Purok 3).</span>
                         </div>
                         <div class="flex flex-col gap-1.5">
                             <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Barangay <span class="text-rose-500">*</span></label>

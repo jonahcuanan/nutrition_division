@@ -20,13 +20,28 @@ $res = $conn->query("SELECT MAX(record_id) as max_id FROM growth_records");
 $row = $res->fetch_assoc();
 $maxId = (int)($row['max_id'] ?? 0);
 
-// Enforce once-per-month limit
 $sessionFile = __DIR__ . '/measurement_session.txt';
-if (file_exists($sessionFile)) {
-    $mtime = filemtime($sessionFile);
-    if (date('Y-m', $mtime) === date('Y-m')) {
-        echo json_encode(['success' => false, 'message' => 'A new measurement period has already been started this month. You can only start one once per calendar month.']);
-        exit;
+$cutoffRecordId = file_exists($sessionFile) ? (int)trim(file_get_contents($sessionFile)) : 0;
+
+if ($cutoffRecordId > 0) {
+    // Check if there are any active children who have NOT been measured in the current period
+    $unmeasuredSql = "
+        SELECT COUNT(*) as unmeasured
+        FROM children c
+        WHERE c.status = 'Active'
+        AND NOT EXISTS (
+            SELECT 1 FROM growth_records gr 
+            WHERE gr.child_id = c.child_id 
+            AND gr.record_id > $cutoffRecordId 
+            AND gr.is_muac_only = FALSE
+        )
+    ";
+    if ($unmeasuredRes = $conn->query($unmeasuredSql)) {
+        $unmeasuredRow = $unmeasuredRes->fetch_assoc();
+        if ((int)$unmeasuredRow['unmeasured'] > 0) {
+            echo json_encode(['success' => false, 'message' => 'You cannot start a new measurement period until all active children have been measured in the current period.']);
+            exit;
+        }
     }
 }
 

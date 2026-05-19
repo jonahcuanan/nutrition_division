@@ -275,13 +275,13 @@ sort($uniqueBarangays);
         <table id="archiveTable" class="table-stack min-w-full border border-slate-300 text-left text-[0.68rem] leading-tight">
             <thead class="text-[0.68rem] font-semibold uppercase tracking-wide text-white">
                 <tr>
-                    <th class="border border-slate-300 bg-[#31869b] px-3 py-2 align-middle">Address / Location</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-3 py-2 align-middle">Barangay</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-3 py-2 align-middle">Guardian / Caregiver</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-3 py-2 align-middle">Full Name of Child</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-3 py-2 text-center align-middle">Belongs to IP Group?</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-3 py-2 text-center align-middle">Sex</th>
-                    <th class="border border-slate-300 bg-[#31869b] px-3 py-2 text-center align-middle">Date of Birth</th>
+                    <th class="border border-slate-300 bg-black px-3 py-2 align-middle">Address / Location</th>
+                    <th class="border border-slate-300 bg-black px-3 py-2 align-middle">Barangay</th>
+                    <th class="border border-slate-300 bg-black px-3 py-2 align-middle">Guardian / Caregiver</th>
+                    <th class="border border-slate-300 bg-black px-3 py-2 align-middle">Full Name of Child</th>
+                    <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Belongs to IP Group?</th>
+                    <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Sex</th>
+                    <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Date of Birth</th>
                     <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Age (Months)</th>
                     <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Date of Archival</th>
                     <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Archive Status</th>

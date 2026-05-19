@@ -50,6 +50,11 @@ $gender_barangay_female = [];
 $inventory_alerts = [];
 $recent_interventions = [];
 
+$wfa_by_barangay = [];
+$hfa_by_barangay = [];
+$wflh_by_barangay = [];
+$muac_by_barangay = [];
+
 require_once 'growth_utils.php';
 
 if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
@@ -193,9 +198,35 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
     $muac_counts = ['Normal' => 0, 'Moderately Wasted' => 0, 'Severely Wasted' => 0];
 
     // Read the cutoff record_id set by "New Measurement Period"
-    $cutoffRecordId = file_exists(__DIR__ . '/measurement_session.txt')
-        ? (int)trim(file_get_contents(__DIR__ . '/measurement_session.txt'))
+    $sessionFile = __DIR__ . '/measurement_session.txt';
+    $cutoffRecordId = file_exists($sessionFile)
+        ? (int)trim(file_get_contents($sessionFile))
         : 0;
+
+    // Only treat the cutoff as active if the session file is from the current month
+    // and a clear_measurements activity exists in the current month.
+    $periodIsNew = false;
+    if (file_exists($sessionFile)) {
+        clearstatcache(true, $sessionFile);
+        $mtime = filemtime($sessionFile);
+        if (date('Y-m', $mtime) === date('Y-m')) {
+            $hasClearThisMonth = false;
+            if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
+                $clearSql = "SELECT 1 FROM user_activity_log WHERE activity_type = 'clear_measurements' AND DATE_FORMAT(activity_time, '%Y-%m') = DATE_FORMAT(CURRENT_DATE, '%Y-%m') LIMIT 1";
+                if ($clearRes = $conn->query($clearSql)) {
+                    $hasClearThisMonth = ($clearRes->num_rows > 0);
+                }
+            }
+
+            if ($hasClearThisMonth) {
+                $periodIsNew = true;
+            } else {
+                $cutoffRecordId = 0;
+            }
+        } else {
+            $cutoffRecordId = 0;
+        }
+    }
 
     // Safeguard: If the cutoff is greater than the max record_id, the database was likely reset.
     if ($cutoffRecordId > 0 && isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
@@ -240,7 +271,6 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
         $measuredThisPeriod = $mtp_row ? (int)$mtp_row[0] : 0;
     }
     $unmeasuredThisPeriod = max(0, $totalActiveChildren - $measuredThisPeriod);
-    $periodIsNew = ($cutoffRecordId > 0);
 
     // Nutritional status counts — scoped to BNS/Health Worker recorded data or all active children
     // Now mirrors the logic in child_profiles.php: honors the measurement period cutoff if set.
@@ -258,13 +288,14 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
 
     $status_sql = "
         SELECT 
-            c.birthdate, g.measurement_date,
+            c.birthdate, g.measurement_date, c.barangay_id, b.barangay_name,
             g.record_id, g.weight, g.height, g.muac_measurement,
             g.weight_id, g.height_id, g.wfl_id,
             wfa.severely_underweight_max, wfa.underweight_min, wfa.underweight_max, wfa.normal_min, wfa.normal_max, wfa.overweight,
             hfa.severely_stunted, hfa.stunted_from, hfa.stunted_to, hfa.normal_from, hfa.normal_to, hfa.tall,
             wfl.severely_wasted, wfl.wasted_from, wfl.wasted_to, wfl.normal_from, wfl.normal_to, wfl.overweight_from, wfl.overweight_to, wfl.obese
         FROM children c
+        JOIN barangays b ON c.barangay_id = b.barangay_id
         JOIN (
             SELECT child_id, record_id, weight, height, muac_measurement, measurement_date, weight_id, height_id, wfl_id,
                    ROW_NUMBER() OVER(PARTITION BY child_id ORDER BY measurement_date DESC, record_id DESC) as rn
@@ -304,21 +335,41 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
                 continue;
             }
 
+            $bName = $row['barangay_name'] ?? 'Unknown';
+            if (!isset($wfa_by_barangay[$bName])) {
+                $wfa_by_barangay[$bName]  = ['Normal' => 0, 'Underweight' => 0, 'Severely Underweight' => 0, 'Overweight' => 0];
+                $hfa_by_barangay[$bName]  = ['Normal' => 0, 'Stunted' => 0, 'Severely Stunted' => 0, 'Tall' => 0];
+                $wflh_by_barangay[$bName] = ['Normal' => 0, 'Wasted' => 0, 'Severely Wasted' => 0, 'Overweight' => 0, 'Obese' => 0];
+                $muac_by_barangay[$bName] = ['Normal' => 0, 'Moderately Wasted' => 0, 'Severely Wasted' => 0];
+            }
+
             if ($hasWeight && $row['severely_underweight_max'] !== null) {
                 $stat = determineWeightForAgeStatus((float)$row['weight'], $row);
-                if ($stat && isset($wfa_counts[$stat])) $wfa_counts[$stat]++;
+                if ($stat && isset($wfa_by_barangay[$bName][$stat])) {
+                    $wfa_by_barangay[$bName][$stat]++;
+                    $wfa_counts[$stat]++;
+                }
             }
             if ($hasHeight && $row['severely_stunted'] !== null) {
                 $stat = determineHeightForAgeStatus((float)$row['height'], $row);
-                if ($stat && isset($hfa_counts[$stat])) $hfa_counts[$stat]++;
+                if ($stat && isset($hfa_by_barangay[$bName][$stat])) {
+                    $hfa_by_barangay[$bName][$stat]++;
+                    $hfa_counts[$stat]++;
+                }
             }
             if ($hasWeight && $hasHeight && $row['severely_wasted'] !== null) {
                 $stat = determineWeightForLengthStatus((float)$row['weight'], $row);
-                if ($stat && isset($wflh_counts[$stat])) $wflh_counts[$stat]++;
+                if ($stat && isset($wflh_by_barangay[$bName][$stat])) {
+                    $wflh_by_barangay[$bName][$stat]++;
+                    $wflh_counts[$stat]++;
+                }
             }
             if ($hasMuac && isset($ageMonths) && $ageMonths >= 6 && $ageMonths <= 59) {
                 $stat = determineMuacStatus((float)$row['muac_measurement']);
-                if ($stat && isset($muac_counts[$stat])) $muac_counts[$stat]++;
+                if ($stat && isset($muac_by_barangay[$bName][$stat])) {
+                    $muac_by_barangay[$bName][$stat]++;
+                    $muac_counts[$stat]++;
+                }
             }
         }
     }
@@ -463,71 +514,76 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
                 <div style="height: 100%; width: <?= $progressPct ?>%; background: <?= $barColor ?>; border-radius: 99px; transition: width 0.4s ease;"></div>
             </div>
         </div>
-        <section class="panels detailed-panels" style="margin-bottom: 24px;">
-            <div class="panel">
-                <div class="panel-head">
-                    <div class="panel-head-icon" style="color: var(--blue-500); border-color: rgba(26,110,216,0.2); background: rgba(26,110,216,0.08);"><svg viewBox="0 0 24 24"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg></div>
-                    <div>
-                        <h3>Weight for Age (WFA)</h3>
-                        <span class="muted">Active children</span>
+        <section class="charts-section detailed-charts" style="margin-bottom: 24px;">
+            <div class="chart-panel">
+                <div class="chart-header">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                        <div class="panel-head-icon" style="color: var(--blue-500); border-color: rgba(26,110,216,0.2); background: rgba(26,110,216,0.08); width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2;"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg></div>
+                        <h3 style="margin:0; font-size:1.05rem; font-weight:700;">Weight for Age (WFA) per Barangay</h3>
                     </div>
+                    <span class="muted">Distribution of active children's weight classification by location</span>
                 </div>
-                <ul class="note-list" style="gap: 12px; margin-top: 16px;">
-                    <li><div class="note-dot" style="background: #00ff00; box-shadow: 0 0 0 4px rgba(0,255,0,0.15);"></div> <span><strong>Normal:</strong> <?= $wfa_counts['Normal'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ffff00; box-shadow: 0 0 0 4px rgba(255,255,0,0.15);"></div> <span><strong>Underweight:</strong> <?= $wfa_counts['Underweight'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ff0000; box-shadow: 0 0 0 4px rgba(255,0,0,0.15);"></div> <span><strong>Severely Underweight:</strong> <?= $wfa_counts['Severely Underweight'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ffc000; box-shadow: 0 0 0 4px rgba(255,192,0,0.15);"></div> <span><strong>Overweight:</strong> <?= $wfa_counts['Overweight'] ?></span></li>
-                </ul>
+                <div class="chart-container">
+                    <?php if (empty($wfa_by_barangay)): ?>
+                        <div class="chart-empty">No data available</div>
+                    <?php else: ?>
+                        <canvas id="wfaChart"></canvas>
+                    <?php endif; ?>
+                </div>
             </div>
 
-            <div class="panel">
-                <div class="panel-head">
-                    <div class="panel-head-icon" style="color: var(--teal-500); border-color: rgba(42,167,160,0.2); background: rgba(42,167,160,0.08);"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
-                    <div>
-                        <h3>Height for Age (HFA)</h3>
-                        <span class="muted">Active children</span>
+            <div class="chart-panel">
+                <div class="chart-header">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                        <div class="panel-head-icon" style="color: var(--teal-500); border-color: rgba(42,167,160,0.2); background: rgba(42,167,160,0.08); width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                        <h3 style="margin:0; font-size:1.05rem; font-weight:700;">Height for Age (HFA) per Barangay</h3>
                     </div>
+                    <span class="muted">Distribution of active children's height classification by location</span>
                 </div>
-                <ul class="note-list" style="gap: 12px; margin-top: 16px;">
-                    <li><div class="note-dot" style="background: #00ff00; box-shadow: 0 0 0 4px rgba(0,255,0,0.15);"></div> <span><strong>Normal/Tall:</strong> <?= $hfa_counts['Normal'] + $hfa_counts['Tall'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ffff00; box-shadow: 0 0 0 4px rgba(255,255,0,0.15);"></div> <span><strong>Stunted:</strong> <?= $hfa_counts['Stunted'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ff0000; box-shadow: 0 0 0 4px rgba(255,0,0,0.15);"></div> <span><strong>Severely Stunted:</strong> <?= $hfa_counts['Severely Stunted'] ?></span></li>
-                </ul>
+                <div class="chart-container">
+                    <?php if (empty($hfa_by_barangay)): ?>
+                        <div class="chart-empty">No data available</div>
+                    <?php else: ?>
+                        <canvas id="hfaChart"></canvas>
+                    <?php endif; ?>
+                </div>
             </div>
 
-            <div class="panel">
-                <div class="panel-head">
-                    <div class="panel-head-icon" style="color: var(--purple-500); border-color: rgba(107,88,214,0.2); background: rgba(107,88,214,0.08);"><svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-                    <div>
-                        <h3>Weight for Length (WFL/H)</h3>
-                        <span class="muted">Active children</span>
+            <div class="chart-panel">
+                <div class="chart-header">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                        <div class="panel-head-icon" style="color: var(--purple-500); border-color: rgba(107,88,214,0.2); background: rgba(107,88,214,0.08); width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" style="width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:2;"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+                        <h3 style="margin:0; font-size:1.05rem; font-weight:700;">Weight for Length (WFL/H) per Barangay</h3>
                     </div>
+                    <span class="muted">Distribution of active children's wasting and obesity classification by location</span>
                 </div>
-                <ul class="note-list" style="gap: 12px; margin-top: 16px;">
-                    <li><div class="note-dot" style="background: #00ff00; box-shadow: 0 0 0 4px rgba(0,255,0,0.15);"></div> <span><strong>Normal:</strong> <?= $wflh_counts['Normal'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ffff00; box-shadow: 0 0 0 4px rgba(255,255,0,0.15);"></div> <span><strong>Wasted:</strong> <?= $wflh_counts['Wasted'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ff0000; box-shadow: 0 0 0 4px rgba(255,0,0,0.15);"></div> <span><strong>Severely Wasted:</strong> <?= $wflh_counts['Severely Wasted'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ffc000; box-shadow: 0 0 0 4px rgba(255,192,0,0.15);"></div> <span><strong>Overweight:</strong> <?= $wflh_counts['Overweight'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ffc000; box-shadow: 0 0 0 4px rgba(255,192,0,0.15);"></div> <span><strong>Obese:</strong> <?= $wflh_counts['Obese'] ?></span></li>
-                </ul>
+                <div class="chart-container">
+                    <?php if (empty($wflh_by_barangay)): ?>
+                        <div class="chart-empty">No data available</div>
+                    <?php else: ?>
+                        <canvas id="wflhChart"></canvas>
+                    <?php endif; ?>
+                </div>
             </div>
         </section>
 
         <span class="section-label">Mid-Upper Arm Circumference (MUAC)</span>
-        <section class="panels detailed-panels" style="margin-bottom: 24px;">
-            <div class="panel" style="max-width: 400px;">
-                <div class="panel-head">
-                    <div class="panel-head-icon" style="color: #ec4899; border-color: rgba(236,72,153,0.2); background: rgba(236,72,153,0.08);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
-                    <div>
-                        <h3>Overall Status</h3>
-                        <span class="muted">Active children (6-59 mos)</span>
+        <section class="charts-section detailed-charts" style="margin-bottom: 24px;">
+            <div class="chart-panel">
+                <div class="chart-header">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                        <div class="panel-head-icon" style="color: #ec4899; border-color: rgba(236,72,153,0.2); background: rgba(236,72,153,0.08); width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+                        <h3 style="margin:0; font-size:1.05rem; font-weight:700;">Mid-Upper Arm Circumference (MUAC) per Barangay</h3>
                     </div>
+                    <span class="muted">Distribution of active children's (6-59 mos) upper arm circumference status by location</span>
                 </div>
-                <ul class="note-list" style="gap: 12px; margin-top: 16px;">
-                    <li><div class="note-dot" style="background: #00ff00; box-shadow: 0 0 0 4px rgba(0,255,0,0.15);"></div> <span><strong>Normal:</strong> <?= $muac_counts['Normal'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ffff00; box-shadow: 0 0 0 4px rgba(255,255,0,0.15);"></div> <span><strong>Moderately Wasted (MAM):</strong> <?= $muac_counts['Moderately Wasted'] ?></span></li>
-                    <li><div class="note-dot" style="background: #ff0000; box-shadow: 0 0 0 4px rgba(255,0,0,0.15);"></div> <span><strong>Severely Wasted (SAM):</strong> <?= $muac_counts['Severely Wasted'] ?></span></li>
-                </ul>
+                <div class="chart-container">
+                    <?php if (empty($muac_by_barangay)): ?>
+                        <div class="chart-empty">No data available</div>
+                    <?php else: ?>
+                        <canvas id="muacChart"></canvas>
+                    <?php endif; ?>
+                </div>
             </div>
         </section>
 
@@ -673,6 +729,11 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
         window.genderBarangayLabels = <?= json_encode($gender_barangay_labels) ?>;
         window.genderBarangayMale = <?= json_encode($gender_barangay_male) ?>;
         window.genderBarangayFemale = <?= json_encode($gender_barangay_female) ?>;
+
+        window.wfaByBarangay = <?= json_encode($wfa_by_barangay) ?>;
+        window.hfaByBarangay = <?= json_encode($hfa_by_barangay) ?>;
+        window.wflhByBarangay = <?= json_encode($wflh_by_barangay) ?>;
+        window.muacByBarangay = <?= json_encode($muac_by_barangay) ?>;
     </script>
     <script src="javascript/dashboard.js"></script>
 

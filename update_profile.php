@@ -64,15 +64,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $upd_g_first    = isset($_POST['guardian_first_name']) ? strtoupper(trim($_POST['guardian_first_name'])) : null;
         $upd_g_last     = isset($_POST['guardian_last_name']) ? strtoupper(trim($_POST['guardian_last_name'])) : null;
 
+        $upd_barangay_id = isset($_POST['barangay_id']) ? (int)$_POST['barangay_id'] : null;
+        $upd_designated_user_id = isset($_POST['designated_user_id']) ? (int)$_POST['designated_user_id'] : null;
+
         if ($upd_first_name && $upd_last_name) {
-            $updChildSql = "UPDATE children SET first_name=?, last_name=?, address=?, sex=?, birthdate=?, is_ip=? WHERE child_id=?";
-            $updChildStmt = $conn->prepare($updChildSql);
-            if ($updChildStmt) {
-                $updChildStmt->bind_param('ssssssi', $upd_first_name, $upd_last_name, $upd_address, $upd_sex, $upd_birthdate, $upd_is_ip, $child_id);
-                $updChildStmt->execute();
-                $updChildStmt->close();
-                $profileUpdated = true;
+            if ($upd_barangay_id > 0) {
+                $updChildSql = "UPDATE children SET first_name=?, last_name=?, address=?, sex=?, birthdate=?, is_ip=?, barangay_id=? WHERE child_id=?";
+                $updChildStmt = $conn->prepare($updChildSql);
+                if ($updChildStmt) {
+                    $updChildStmt->bind_param('ssssssii', $upd_first_name, $upd_last_name, $upd_address, $upd_sex, $upd_birthdate, $upd_is_ip, $upd_barangay_id, $child_id);
+                    $updChildStmt->execute();
+                    $updChildStmt->close();
+                    $profileUpdated = true;
+                }
+            } else {
+                $updChildSql = "UPDATE children SET first_name=?, last_name=?, address=?, sex=?, birthdate=?, is_ip=? WHERE child_id=?";
+                $updChildStmt = $conn->prepare($updChildSql);
+                if ($updChildStmt) {
+                    $updChildStmt->bind_param('ssssssi', $upd_first_name, $upd_last_name, $upd_address, $upd_sex, $upd_birthdate, $upd_is_ip, $child_id);
+                    $updChildStmt->execute();
+                    $updChildStmt->close();
+                    $profileUpdated = true;
+                }
             }
+
+            if ($upd_designated_user_id > 0) {
+                // Find latest record_id for child
+                $latestRecQuery = $conn->prepare("SELECT record_id FROM growth_records WHERE child_id = ? ORDER BY measurement_date DESC, record_id DESC LIMIT 1");
+                if ($latestRecQuery) {
+                    $latestRecQuery->bind_param('i', $child_id);
+                    $latestRecQuery->execute();
+                    $latestRecRes = $latestRecQuery->get_result();
+                    if ($latestRecRow = $latestRecRes->fetch_assoc()) {
+                        $latestRecordId = (int)$latestRecRow['record_id'];
+                        $updRecSql = "UPDATE growth_records SET recorded_by = ? WHERE record_id = ?";
+                        $updRecStmt = $conn->prepare($updRecSql);
+                        if ($updRecStmt) {
+                            $updRecStmt->bind_param('ii', $upd_designated_user_id, $latestRecordId);
+                            $updRecStmt->execute();
+                            $updRecStmt->close();
+                        }
+                    }
+                    $latestRecQuery->close();
+                }
+            }
+
             if ($upd_birthdate) $childRow['birthdate'] = $upd_birthdate;
             if ($upd_sex) $childRow['sex'] = $upd_sex;
         }
@@ -162,34 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $muac = 0;
         }
 
-        // Enforce limits separately
-        $measCountSql = "SELECT COUNT(*) as c FROM growth_records WHERE child_id = ? AND DATE_FORMAT(measurement_date, '%Y-%m') = ? AND is_muac_only = FALSE";
-        $stMeas = $conn->prepare($measCountSql);
-        $stMeas->bind_param('is', $child_id, $currentMonth);
-        $stMeas->execute();
-        $measCount = $stMeas->get_result()->fetch_assoc()['c'] ?? 0;
-        $stMeas->close();
 
-        $muacCountSql = "SELECT COUNT(*) as c FROM growth_records WHERE child_id = ? AND DATE_FORMAT(measurement_date, '%Y-%m') = ? AND (is_muac_only = TRUE OR muac_measurement > 0)";
-        $stMuac = $conn->prepare($muacCountSql);
-        $stMuac->bind_param('is', $child_id, $currentMonth);
-        $stMuac->execute();
-        $muacCount = $stMuac->get_result()->fetch_assoc()['c'] ?? 0;
-        $stMuac->close();
-
-        if ($update_mode === 'measurement' || $update_mode === 'both') {
-            if ($measCount >= 2) {
-                echo json_encode(['success' => false, 'message' => 'Limit reached: This child already has 2 measurement records this month.']);
-                exit;
-            }
-        }
-
-        if ($update_mode === 'muac') {
-            if ($muacCount >= 2) {
-                echo json_encode(['success' => false, 'message' => 'Limit reached: This child already has 2 MUAC records this month.']);
-                exit;
-            }
-        }
 
         // Inheritance logic for MUAC mode
         if ($update_mode === 'muac') {
