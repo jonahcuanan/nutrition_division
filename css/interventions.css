@@ -662,6 +662,17 @@ body {
     text-align: left;
 }
 
+.child-barangay-cell {
+    color: var(--slate-600);
+    line-height: 1.45;
+    text-align: left;
+}
+
+.child-date-cell {
+    white-space: nowrap;
+    text-align: center;
+}
+
 .child-sex-cell,
 .view-child-sex {
     white-space: nowrap;
@@ -866,6 +877,10 @@ body {
 }
 
 .child-select-table.edit-like-view .child-location-cell {
+    color: var(--slate-600);
+}
+
+.child-select-table.edit-like-view .child-barangay-cell {
     color: var(--slate-600);
 }
 

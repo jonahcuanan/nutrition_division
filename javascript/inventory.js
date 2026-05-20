@@ -371,19 +371,37 @@
     // ── Distribution month filter ──
     const distMonthSelect = document.getElementById('distMonthFilter');
     const distSearch = document.getElementById('distSearch');
+    const distBarangaySelect = document.getElementById('distBarangayFilter');
+    const distYearSelect = document.getElementById('distYearFilter');
+    const distItemSelect = document.getElementById('distItemFilter');
     const distRows = document.querySelectorAll('#distBody tr[data-month]');
     const distNoResults = document.getElementById('distNoResults');
 
     function applyDistFilters() {
-        if (!distMonthSelect) return;
-        const monthVal = distMonthSelect.value;
+        if (!distMonthSelect && !distBarangaySelect && !distYearSelect && !distItemSelect && !distSearch) return;
+        const monthVal = distMonthSelect ? distMonthSelect.value : '';
+        const barangayVal = distBarangaySelect ? distBarangaySelect.value.toLowerCase().trim() : '';
+        const yearVal = distYearSelect ? distYearSelect.value : '';
+        const itemVal = distItemSelect ? distItemSelect.value.toLowerCase().trim() : '';
         const q = distSearch ? distSearch.value.toLowerCase().trim() : '';
         let visible = 0;
 
-        distRows.forEach(row => {
-            const matchMonth = !monthVal || row.dataset.month === monthVal;
+        const rows = document.querySelectorAll('#distBody tr[data-month]');
+        rows.forEach(row => {
+            const rawMonth = (row.dataset.month || '').trim();
+            const rawMonthPart = rawMonth ? (rawMonth.split('-')[1] || '') : '';
+            const rowMonthPadded = rawMonthPart ? rawMonthPart.padStart(2, '0') : '';
+            const rowYear = row.dataset.year || '';
+            const rowBarangay = (row.dataset.barangay || '').toLowerCase();
+            const rowItem = (row.dataset.item || '').toLowerCase();
+            const matchMonth = !monthVal || (monthVal && rowMonthPadded === monthVal);
+            // Debug: uncomment to inspect month parsing when troubleshooting
+            // if (monthVal && rowMonthPadded !== monthVal) console.debug('Month mismatch', { row: row, rawMonth, rowMonthPadded, monthVal });
+            const matchBarangay = !barangayVal || rowBarangay === barangayVal;
+            const matchYear = !yearVal || rowYear === yearVal;
+            const matchItem = !itemVal || rowItem === itemVal;
             const matchSearch = !q || (row.dataset.search && row.dataset.search.includes(q));
-            const show = matchMonth && matchSearch;
+            const show = matchMonth && matchBarangay && matchYear && matchItem && matchSearch;
             row.style.display = show ? '' : 'none';
             if (show) visible++;
         });
@@ -394,8 +412,11 @@
     }
 
     if (distMonthSelect) distMonthSelect.addEventListener('change', applyDistFilters);
+    if (distBarangaySelect) distBarangaySelect.addEventListener('change', applyDistFilters);
+    if (distYearSelect) distYearSelect.addEventListener('change', applyDistFilters);
+    if (distItemSelect) distItemSelect.addEventListener('change', applyDistFilters);
     if (distSearch) distSearch.addEventListener('input', applyDistFilters);
-    if (distMonthSelect || distSearch) applyDistFilters();
+    if (distMonthSelect || distBarangaySelect || distYearSelect || distItemSelect || distSearch) applyDistFilters();
 
     // ── AJAX Form Submission ──
     document.addEventListener('submit', async (e) => {

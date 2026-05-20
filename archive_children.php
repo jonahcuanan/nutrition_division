@@ -353,13 +353,17 @@ sort($uniqueBarangays);
     <!-- Table -->
     <div class="child-table-wrap overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table id="archiveTable" class="table-stack min-w-full border border-slate-300 text-left text-[0.68rem] leading-tight">
-            <thead class="text-[0.68rem] font-semibold uppercase tracking-wide text-white">
+            <thead class="text-[0.58rem] font-semibold uppercase tracking-wide text-white">
                 <tr>
                     <th class="border border-slate-300 bg-black px-3 py-2 align-middle">Address / Location</th>
                     <th class="border border-slate-300 bg-black px-3 py-2 align-middle">Barangay</th>
                     <th class="border border-slate-300 bg-black px-3 py-2 align-middle">Guardian / Caregiver</th>
                     <th class="border border-slate-300 bg-black px-3 py-2 align-middle">Full Name of Child</th>
-                    <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Belongs to IP Group?</th>
+                    <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">
+                        <span class="block">Belongs</span>
+                        <span class="block">to IP</span>
+                        <span class="block">Group?</span>
+                    </th>
                     <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Sex</th>
                     <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Date of Birth</th>
                     <th class="border border-slate-300 bg-black px-3 py-2 text-center align-middle">Age (Months)</th>

@@ -947,7 +947,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
     <!-- Screen Table -->
     <div class="screen-only child-table-wrap overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table class="table-stack min-w-full border border-slate-300 text-left text-[0.62rem] leading-tight">
-            <thead class="text-[0.68rem] font-semibold uppercase tracking-wide text-white">
+            <thead class="text-[0.58rem] font-semibold uppercase tracking-wide text-white">
                 <tr>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 align-middle">Address / Location</th>
                     <?php if ($isAdmin): ?>
@@ -955,7 +955,11 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                     <?php endif; ?>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 align-middle">Mother / Caregiver</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 align-middle">Full Name of Child</th>
-                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Belongs to IP Group?</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">
+                        <span class="block">Belongs</span>
+                        <span class="block">to IP</span>
+                        <span class="block">Group?</span>
+                    </th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Sex</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Date of Birth</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Date Measured</th>
@@ -1213,19 +1217,19 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                     <div class="border-t border-slate-200 px-4 pb-4 pt-3 bg-white">
                         <div class="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
                             <div class="flex flex-col gap-1 text-[0.78rem]">
-                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">First Name <span class="text-rose-500">*</span></label>
+                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">First Name</label>
                                 <input type="text" name="first_name" id="edit_first_name" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
                             <div class="flex flex-col gap-1 text-[0.78rem]">
-                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Last Name <span class="text-rose-500">*</span></label>
+                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Last Name</label>
                                 <input type="text" name="last_name" id="edit_last_name" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
                             <div class="flex flex-col gap-1 text-[0.78rem]">
-                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Date of Birth <span class="text-rose-500">*</span></label>
+                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Date of Birth</label>
                                 <input type="date" name="birthdate" id="edit_birthdate" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
                             <div class="flex flex-col gap-1 text-[0.78rem]">
-                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Sex <span class="text-rose-500">*</span></label>
+                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Sex</label>
                                 <select name="sex" id="edit_sex" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100 bg-white">
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
@@ -1236,7 +1240,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                                 <input type="text" name="address" id="edit_address" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
                              <div class="flex flex-col gap-1 text-[0.78rem] sm:col-span-2">
-                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Barangay <span class="text-rose-500">*</span></label>
+                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Barangay</label>
                                  <select name="barangay_id" id="edit_barangay_id" required class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100 bg-white" <?= $limit_barangay ? 'disabled' : '' ?>>
                                      <option value="">Select barangay</option>
                                      <?php foreach ($barangaysList as $b): ?>
@@ -1268,8 +1272,10 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Mother/Caregiver Last</label>
                                 <input type="text" name="guardian_last_name" id="edit_g_last" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
-                            <div class="flex flex-col gap-1 text-[0.78rem] sm:col-span-2">
-                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Belongs to IP Group? <span class="text-rose-500">*</span></label>
+                            <div class="flex flex-col gap-1 text-[0.78rem]">
+                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">
+                                    <span class="block">Belongs to IP Group?</span>
+                                </label>
                                 <select name="is_ip" id="edit_ip" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100 bg-white">
                                     <option value="No">No</option>
                                     <option value="Yes">Yes</option>
@@ -1281,7 +1287,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
 
                 <!-- ── New Measurement Inputs ── -->
                 <div id="measurementSection" class="mb-4">
-                <div class="mb-2 flex items-center gap-2 text-[0.7rem] font-bold uppercase tracking-wide text-slate-600">
+                    <div class="mb-2 flex items-center gap-2 text-[0.7rem] font-bold uppercase tracking-wide text-slate-600">
                     <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-[0.8rem] shadow-sm">📏</span>
                     New Measurement
                 </div>
@@ -1295,11 +1301,11 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                         <input type="number" name="age_in_months" id="age_in_months" min="0" class="w-full rounded-md border border-slate-300 bg-emerald-50 px-3 py-2 text-[0.85rem] font-bold text-emerald-800 shadow-sm outline-none cursor-default" readonly />
                     </div>
                     <div class="flex flex-col gap-1 text-[0.78rem]">
-                        <label for="height" class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Height (cm) <span class="text-rose-500">*</span></label>
+                        <label for="height" class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Height (cm)</label>
                         <input type="number" step="0.1" min="0" name="height" id="height" placeholder="e.g. 75.5" class="w-full rounded-md border border-slate-300 px-3 py-2 text-[0.85rem] font-bold text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-shadow" />
                     </div>
                     <div class="flex flex-col gap-1 text-[0.78rem]">
-                        <label for="weight" class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Weight (kg) <span class="text-rose-500">*</span></label>
+                        <label for="weight" class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Weight (kg)</label>
                         <input type="number" step="0.1" min="0" name="weight" id="weight" placeholder="e.g. 10.2" class="w-full rounded-md border border-slate-300 px-3 py-2 text-[0.85rem] font-bold text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-shadow" />
                     </div>
                     <div id="muacUpdateContainer" class="flex flex-col gap-1 text-[0.78rem]">
@@ -1340,8 +1346,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 <div id="updateModalMessage" class="mt-3 text-xs"></div>
             </form>
             </div>
-            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
-                <div class="text-[0.72rem] text-slate-400"><span class="text-rose-500">*</span> Required fields</div>
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
                 <div class="flex items-center gap-2">
                     <button type="button" id="btnUpdateCancel" class="rounded-md border border-slate-300 bg-white px-4 py-2 text-[0.82rem] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">Cancel</button>
                     <button type="submit" id="btnUpdateSave" form="updateProfileForm" class="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-[0.82rem] font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300">Save Changes</button>

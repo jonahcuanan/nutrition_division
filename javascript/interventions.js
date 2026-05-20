@@ -620,7 +620,8 @@ if (btnOpenInterventionModal) {
         childPickerMode = 'add';
         document.getElementById('interventionModalTitle').textContent = 'Add Intervention';
         document.getElementById('type_id_modal').value = '';
-        document.getElementById('intervention_date_modal').value = window.currentDate || '';
+        const dateInput = document.getElementById('intervention_date_modal');
+        if (dateInput) { dateInput.value = window.currentDate || ''; dateInput.min = ''; }
         document.getElementById('form_action').value = 'add_intervention';
         if (confirmOverrideInput) confirmOverrideInput.value = '0';
         document.getElementById('original_type_id').value = '';
@@ -714,6 +715,7 @@ if (childrenList) {
     childrenList.addEventListener('change', () => {
         syncSelectedRowState();
         updateCheckedCount();
+        updateInterventionDateMin();
         syncGiveOutQtyInputDefault();
         syncGiveOutQuantitiesToChildCount();
         scheduleGiveOutValidationModal();
@@ -762,12 +764,12 @@ function renderPastInterventionList(items) {
         const items = escHtml(item.items_summary || '');
 
         card.innerHTML = `
-            <div style="font-weight:700;color:var(--slate-900);font-size:14px;border-bottom:1px solid var(--slate-100);padding-bottom:6px;margin-bottom:8px;">${name}</div>
+            <div style="font-weight:700;color:var(--slate-900);font-size:14px;border-bottom:1px solid var(--slate-100);padding-bottom:6px;margin-bottom:8px;word-break:break-word;overflow-wrap:break-word;">${name}</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <div style="font-size:12px;color:var(--slate-600);"><span style="font-weight:600;color:var(--slate-800);">Date:</span> ${date}</div>
-                ${items ? `<div style="font-size:12px;color:var(--slate-600);"><span style="font-weight:600;color:var(--slate-800);">Items:</span> ${items}</div>` : ''}
+                <div style="font-size:12px;color:var(--slate-600);word-break:break-word;overflow-wrap:break-word;"><span style="font-weight:600;color:var(--slate-800);">Date:</span> ${date}</div>
+                ${items ? `<div style="font-size:12px;color:var(--slate-600);word-break:break-word;overflow-wrap:break-word;"><span style="font-weight:600;color:var(--slate-800);">Items:</span> ${items}</div>` : ''}
             </div>
-            <div style="font-size:12px;color:var(--slate-600);margin-top:6px;"><span style="font-weight:600;color:var(--slate-800);">Notes:</span> ${desc}</div>
+            <div style="font-size:12px;color:var(--slate-600);margin-top:6px;word-break:break-word;overflow-wrap:break-word;"><span style="font-weight:600;color:var(--slate-800);">Notes:</span> ${desc}</div>
         `;
         pastInterventionList.appendChild(card);
     });
@@ -782,7 +784,7 @@ function resetInterventionFormState() {
     const typeSelect = document.getElementById('type_id_modal');
     if (typeSelect) typeSelect.value = '';
     const dateInput = document.getElementById('intervention_date_modal');
-    if (dateInput) dateInput.value = window.currentDate || '';
+    if (dateInput) { dateInput.value = window.currentDate || ''; dateInput.min = ''; }
     const descInput = document.getElementById('description_modal');
     if (descInput) descInput.value = '';
     const originalType = document.getElementById('original_type_id');
@@ -1133,6 +1135,7 @@ if (selectAllBtn) {
         });
         syncSelectedRowState();
         updateCheckedCount();
+        updateInterventionDateMin();
         syncGiveOutQtyInputDefault();
         syncGiveOutQuantitiesToChildCount();
         scheduleGiveOutValidationModal();
@@ -1145,6 +1148,7 @@ if (clearAllBtn) {
         document.querySelectorAll("input[name='child_ids[]']").forEach(cb => cb.checked = false);
         syncSelectedRowState();
         updateCheckedCount();
+        updateInterventionDateMin();
         syncGiveOutQtyInputDefault();
         syncGiveOutQuantitiesToChildCount();
         scheduleGiveOutValidationModal();
@@ -1156,6 +1160,42 @@ function updateCheckedCount() {
     if (!checkedCountEl) return;
     const n = document.querySelectorAll("input[name='child_ids[]']:checked").length;
     checkedCountEl.textContent = n;
+}
+
+/**
+ * Sets the minimum allowed intervention date to the latest measurement date
+ * among all currently checked children (add mode only).
+ * This prevents selecting a date before any selected child was measured.
+ */
+function updateInterventionDateMin() {
+    if (!interventionDateInput) return;
+    // In edit mode, don't restrict the date
+    if (childPickerMode === 'edit') return;
+
+    const checkedRows = Array.from(
+        document.querySelectorAll("input[name='child_ids[]']:checked")
+    ).map(cb => cb.closest('.child-check-row')).filter(Boolean);
+
+    if (checkedRows.length === 0) {
+        interventionDateInput.min = '';
+        return;
+    }
+
+    // Find the latest measurement date among all selected children
+    let latestDate = '';
+    checkedRows.forEach(row => {
+        const md = (row.dataset.measurementDate || '').trim();
+        if (md && (!latestDate || md > latestDate)) {
+            latestDate = md;
+        }
+    });
+
+    interventionDateInput.min = latestDate;
+
+    // If the currently entered date is before the new minimum, auto-advance it
+    if (latestDate && interventionDateInput.value && interventionDateInput.value < latestDate) {
+        interventionDateInput.value = latestDate;
+    }
 }
 
 function syncSelectedRowState() {

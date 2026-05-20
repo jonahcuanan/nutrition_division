@@ -57,6 +57,53 @@ if (isset($_GET['action']) && $_GET['action'] === 'check_email_exists') {
     exit;
 }
 
+// ── AJAX ENDPOINT: CHECK NAME EXISTS ──
+if (isset($_GET['action']) && $_GET['action'] === 'check_name_exists') {
+    header('Content-Type: application/json');
+    $firstName = trim($_POST['first_name'] ?? '');
+    $lastName = trim($_POST['last_name'] ?? '');
+
+    $session_uid = (int)($_SESSION['user_id'] ?? 0);
+    $post_exclude = isset($_POST['exclude_user_id']) ? (int)$_POST['exclude_user_id'] : 0;
+    $exclude_ids = array_filter(array_unique([$session_uid, $post_exclude]));
+
+    if ($firstName === '' || $lastName === '') {
+        echo json_encode(['success' => true, 'exists' => false]);
+        exit;
+    }
+
+    if (!empty($exclude_ids)) {
+        $placeholders = implode(',', array_fill(0, count($exclude_ids), '?'));
+        $types = str_repeat('i', count($exclude_ids));
+        $sql  = "SELECT 1 FROM users WHERE LOWER(TRIM(first_name)) = LOWER(?) AND LOWER(TRIM(last_name)) = LOWER(?) AND user_id NOT IN ($placeholders) LIMIT 1";
+        $stmt = $conn->prepare($sql);
+        if ($stmt) {
+            $params = array_merge([$firstName, $lastName], array_values($exclude_ids));
+            $bind_types = 'ss' . $types;
+            $stmt->bind_param($bind_types, ...$params);
+        }
+    } else {
+        $sql  = "SELECT 1 FROM users WHERE LOWER(TRIM(first_name)) = LOWER(?) AND LOWER(TRIM(last_name)) = LOWER(?) LIMIT 1";
+        $stmt = $conn->prepare($sql);
+        if ($stmt) $stmt->bind_param('ss', $firstName, $lastName);
+    }
+
+    if ($stmt) {
+        $stmt->execute();
+        $stmt->store_result();
+        $exists = ($stmt->num_rows > 0);
+        $stmt->close();
+        echo json_encode([
+            'success' => true,
+            'exists' => $exists,
+            'message' => $exists ? 'A user with the same first and last name already exists.' : ''
+        ]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Database error.']);
+    }
+    exit;
+}
+
 function generate_unique_user_id(mysqli $conn): ?int {
     for ($i = 0; $i < 20; $i++) {
         $candidate = random_int(1, 999999);
@@ -81,6 +128,21 @@ $successMessage = '';
 $errorMessage = '';
 $sessionUserId = (int)($_SESSION['user_id'] ?? 0);
 
+// Load current user's name details for the My Account form
+$currentUser = null;
+if ($sessionUserId > 0) {
+    $uStmt = $conn->prepare('SELECT first_name, middle_name, last_name, suffix FROM users WHERE user_id = ? LIMIT 1');
+    if ($uStmt) {
+        $uStmt->bind_param('i', $sessionUserId);
+        $uStmt->execute();
+        $uRes = $uStmt->get_result();
+        if ($uRes && ($uRow = $uRes->fetch_assoc())) {
+            $currentUser = $uRow;
+        }
+        $uStmt->close();
+    }
+}
+
 // Redirect non-admins away from activity logs or users account tabs
 if (!$isAdmin && isset($_GET['tab']) && in_array($_GET['tab'], ['activity_logs', 'users_account'])) {
     header('Location: account_settings.php');
@@ -98,6 +160,17 @@ if ($barangayQuery) {
 
 // Handle My Account updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
+    $isAjaxRequest = false;
+    if (isset($_POST['ajax']) && $_POST['ajax'] === '1') {
+        $isAjaxRequest = true;
+    } elseif (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        $isAjaxRequest = true;
+    }
+
+    $firstName = trim($_POST['first_name'] ?? '');
+    $middleName = trim($_POST['middle_name'] ?? '');
+    $lastName = trim($_POST['last_name'] ?? '');
+    $suffix = trim($_POST['suffix'] ?? '');
     $newEmail    = trim($_POST['email'] ?? '');
     $newPassword = $_POST['password'] ?? '';
     $confirmPw   = $_POST['confirm_password'] ?? '';
@@ -130,6 +203,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
     }
 
     if (empty($errors)) {
+        // Prevent duplicate full name (first + last) across users
+        $nameCheck = $conn->prepare('SELECT 1 FROM users WHERE LOWER(TRIM(first_name)) = LOWER(?) AND LOWER(TRIM(last_name)) = LOWER(?) AND user_id != ? LIMIT 1');
+        if ($nameCheck) {
+            $nameCheck->bind_param('ssi', $firstName, $lastName, $sessionUserId);
+            $nameCheck->execute();
+            $nameCheck->store_result();
+            if ($nameCheck->num_rows > 0) $errors[] = 'A user with the same first and last name already exists.';
+            $nameCheck->close();
+        }
+    }
+
+    if (empty($errors)) {
         if ($sessionUserId <= 0) {
             $errorMessage = 'Session expired. Please log in again.';
         }
@@ -138,30 +223,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
     if (empty($errors) && $errorMessage === '') {
         if ($newPassword !== '') {
             $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare('UPDATE users SET email = ?, password = ? WHERE user_id = ?');
+            $stmt = $conn->prepare('UPDATE users SET first_name = ?, middle_name = ?, last_name = ?, suffix = ?, email = ?, password = ? WHERE user_id = ?');
             if ($stmt) {
-                $stmt->bind_param('ssi', $newEmail, $hashed, $sessionUserId);
+                $stmt->bind_param('ssssssi', $firstName, $middleName, $lastName, $suffix, $newEmail, $hashed, $sessionUserId);
                 $ok = $stmt->execute();
                 $stmt->close();
                 if ($ok) {
                     $_SESSION['email'] = $newEmail;
+                    $_SESSION['first_name'] = $firstName;
+                    $_SESSION['middle_name'] = $middleName;
+                    $_SESSION['last_name'] = $lastName;
+                    $_SESSION['suffix'] = $suffix;
+                    $fullNameParts = array_filter([$firstName, $middleName, $lastName, $suffix]);
+                    $_SESSION['full_name'] = trim(implode(' ', $fullNameParts));
                     log_user_activity($conn, $sessionUserId, 'change_password');
                     $successMessage = 'Account updated successfully.';
                 }
                 else $errorMessage = 'Failed to update account.';
             } else { $errorMessage = 'Database error while updating account.'; }
         } else {
-            $stmt = $conn->prepare('UPDATE users SET email = ? WHERE user_id = ?');
+            $stmt = $conn->prepare('UPDATE users SET first_name = ?, middle_name = ?, last_name = ?, suffix = ?, email = ? WHERE user_id = ?');
             if ($stmt) {
-                $stmt->bind_param('si', $newEmail, $sessionUserId);
+                $stmt->bind_param('sssssi', $firstName, $middleName, $lastName, $suffix, $newEmail, $sessionUserId);
                 $ok = $stmt->execute();
                 $stmt->close();
-                if ($ok) { $_SESSION['email'] = $newEmail; $successMessage = 'Account updated successfully.'; }
+                if ($ok) {
+                    $_SESSION['email'] = $newEmail;
+                    $_SESSION['first_name'] = $firstName;
+                    $_SESSION['middle_name'] = $middleName;
+                    $_SESSION['last_name'] = $lastName;
+                    $_SESSION['suffix'] = $suffix;
+                    $fullNameParts = array_filter([$firstName, $middleName, $lastName, $suffix]);
+                    $_SESSION['full_name'] = trim(implode(' ', $fullNameParts));
+                    $successMessage = 'Account updated successfully.';
+                }
                 else $errorMessage = 'Failed to update account.';
             } else { $errorMessage = 'Database error while updating account.'; }
         }
     } else {
         $errorMessage = implode(' ', $errors);
+    }
+
+    if ($isAjaxRequest) {
+        header('Content-Type: application/json');
+        $ok = ($successMessage !== '' && $errorMessage === '');
+        $payload = [
+            'success' => $ok,
+            'message' => $ok ? $successMessage : ($errorMessage !== '' ? $errorMessage : 'Unable to update account.'),
+            'display_name' => $ok ? (string)($_SESSION['full_name'] ?? '') : '',
+            'fields' => $ok ? [
+                'first_name' => $firstName,
+                'middle_name' => $middleName,
+                'last_name' => $lastName,
+                'suffix' => $suffix,
+                'email' => $newEmail,
+            ] : null,
+        ];
+        echo json_encode($payload);
+        exit;
     }
 }
 
@@ -335,7 +454,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
     <!-- ── Nav Tabs ── -->
     <nav class="settings-nav">
         <a href="account_settings.php" class="<?= $isSettingsTab ? 'active' : '' ?>">
-            ⚙️ Account Settings
+            ⚙️ Credentials
         </a>
         <?php if ($isAdmin): ?>
         <a href="account_settings.php?tab=users_account" class="<?= $isUsersAccountTab ? 'active' : '' ?>">
@@ -410,7 +529,9 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                     'login'           => ['label' => 'Logged In',         'icon' => '🔓', 'bg' => '#d1fae5', 'color' => '#065f46'],
                                     'logout'          => ['label' => 'Logged Out',        'icon' => '🔒', 'bg' => '#fee2e2', 'color' => '#991b1b'],
                                     'add_profile'     => ['label' => 'Added Profile',     'icon' => '👶', 'bg' => '#dbeafe', 'color' => '#1e40af'],
-                                    'edit_profile'    => ['label' => 'Updated Measurement','icon' => '📏', 'bg' => '#ede9fe', 'color' => '#5b21b6'],
+                                    'edit_profile'    => ['label' => 'Edited Profile',    'icon' => '✏️', 'bg' => '#ede9fe', 'color' => '#5b21b6'],
+                                    'update_measurement' => ['label' => 'Updated Measurement','icon' => '📏', 'bg' => '#dbeafe', 'color' => '#1d4ed8'],
+                                    'update_muac'     => ['label' => 'Updated MUAC',      'icon' => '📐', 'bg' => '#dcfce7', 'color' => '#166534'],
                                     'generate_report' => ['label' => 'Generated Report',  'icon' => '📄', 'bg' => '#fef9c3', 'color' => '#713f12'],
                                     'change_password' => ['label' => 'Changed Password',  'icon' => '🔑', 'bg' => '#ffedd5', 'color' => '#92400e'],
                                     'clear_measurements'=>['label'=> 'Cleared Measurements','icon'=> '🗑️','bg' => '#f3f4f6', 'color' => '#374151'],
@@ -428,12 +549,16 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                     'archive_child'         => ['label' => 'Archived Child Profile',  'icon' => '🗂️', 'bg' => '#ffe4e6', 'color' => '#9f1239'],
                                     'restore_child'         => ['label' => 'Restored Child Profile',  'icon' => '♻️', 'bg' => '#dcfce7', 'color' => '#166534'],
                                 ];
-                                $badge = $badgeMap[$actType] ?? [
-                                    'label' => ucwords(str_replace('_', ' ', $actType)),
-                                    'icon'  => '📋',
-                                    'bg'    => '#f3f4f6',
-                                    'color' => '#374151',
-                                ];
+                                if ($actType === 'edit_profile' && stripos($logDetails, 'Measurement:') !== false) {
+                                    $badge = ['label' => 'Updated Measurement', 'icon' => '📏', 'bg' => '#dbeafe', 'color' => '#1d4ed8'];
+                                } else {
+                                    $badge = $badgeMap[$actType] ?? [
+                                        'label' => ucwords(str_replace('_', ' ', $actType)),
+                                        'icon'  => '📋',
+                                        'bg'    => '#f3f4f6',
+                                        'color' => '#374151',
+                                    ];
+                                }
                             ?>
                                 <tr>
                                     <td><span class="ua-username"><?= htmlspecialchars(str_pad((string)$row['user_id'], 6, '0', STR_PAD_LEFT)) ?></span></td>
@@ -588,41 +713,73 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
 
                         <div class="section-label">Login Credentials</div>
 
-                        <div class="field">
-                            <label>User ID</label>
-                            <div class="input-readonly-locked no-click" title="User ID cannot be edited">
-                                <?= htmlspecialchars(str_pad((string)($sessionUserId > 0 ? $sessionUserId : ''), 6, '0', STR_PAD_LEFT)) ?>
+                        <div class="form-grid-2">
+                            <div class="field">
+                                <label>First Name</label>
+                                <input type="text" name="first_name"
+                                       value="<?= htmlspecialchars($currentUser['first_name'] ?? '') ?>"
+                                       placeholder="First name">
                             </div>
-                            <span class="hint">This ID is system-assigned and cannot be edited.</span>
+                            <div class="field">
+                                <label>Middle Name</label>
+                                <input type="text" name="middle_name"
+                                       value="<?= htmlspecialchars($currentUser['middle_name'] ?? '') ?>"
+                                       placeholder="Middle name">
+                            </div>
                         </div>
-                        <div class="field">
-                            <label>Email Address <span class="req">*</span></label>
-                            <input type="email" name="email"
-                                   value="<?= htmlspecialchars($_SESSION['email'] ?? '') ?>"
-                                   placeholder="your@gmail.com" required
-                                   pattern="[a-zA-Z0-9._%+-]+@gmail\.com"
-                                   title="Email address must end with @gmail.com">
+                        <div class="form-grid-2">
+                            <div class="field">
+                                <label>Last Name</label>
+                                <input type="text" name="last_name"
+                                       value="<?= htmlspecialchars($currentUser['last_name'] ?? '') ?>"
+                                       placeholder="Last name">
+                            </div>
+                            <div class="field">
+                                <label>Suffix</label>
+                                <input type="text" name="suffix"
+                                       value="<?= htmlspecialchars($currentUser['suffix'] ?? '') ?>"
+                                       placeholder="Suffix (e.g., Jr., III)">
+                            </div>
+                        </div>
+                        <div class="form-grid-2">
+                            <div class="field">
+                                <label>User ID</label>
+                                <div class="input-readonly-locked no-click" title="User ID cannot be edited">
+                                    <?= htmlspecialchars(str_pad((string)($sessionUserId > 0 ? $sessionUserId : ''), 6, '0', STR_PAD_LEFT)) ?>
+                                </div>
+                                <span class="hint">This ID is system-assigned and cannot be edited.</span>
+                            </div>
+                            <div class="field">
+                                <label>Email Address <span class="req">*</span></label>
+                                <input type="email" name="email"
+                                       value="<?= htmlspecialchars($_SESSION['email'] ?? '') ?>"
+                                       placeholder="your@gmail.com" required
+                                       pattern="[a-zA-Z0-9._%+-]+@gmail\.com"
+                                       title="Email address must end with @gmail.com">
+                            </div>
                         </div>
 
                         <hr class="divider">
                         <div class="section-label">Change Password</div>
 
-                        <div class="field">
-                            <label>New Password</label>
-                            <div class="password-field">
-                                <input type="password" name="password" id="myPassword"
-                                       placeholder="Leave blank to keep current"
-                                       autocomplete="new-password">
-                                <button type="button" class="pw-toggle" data-target="myPassword" aria-label="Show password">Show</button>
+                        <div class="form-grid-2">
+                            <div class="field">
+                                <label>New Password</label>
+                                <div class="password-field">
+                                    <input type="password" name="password" id="myPassword"
+                                           placeholder="Leave blank to keep current"
+                                           autocomplete="new-password">
+                                    <button type="button" class="pw-toggle" data-target="myPassword" aria-label="Show password">Show</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="field">
-                            <label>Confirm New Password</label>
-                            <div class="password-field">
-                                <input type="password" name="confirm_password" id="myPasswordConfirm"
-                                       placeholder="Re-enter new password"
-                                       autocomplete="new-password">
-                                <button type="button" class="pw-toggle" data-target="myPasswordConfirm" aria-label="Show password">Show</button>
+                            <div class="field">
+                                <label>Confirm New Password</label>
+                                <div class="password-field">
+                                    <input type="password" name="confirm_password" id="myPasswordConfirm"
+                                           placeholder="Re-enter new password"
+                                           autocomplete="new-password">
+                                    <button type="button" class="pw-toggle" data-target="myPasswordConfirm" aria-label="Show password">Show</button>
+                                </div>
                             </div>
                         </div>
 
@@ -631,54 +788,6 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                             Save Changes
                         </button>
                     </form>
-                </div>
-            </div>
-
-            <!-- ── Security Tips Card ── -->
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-header-icon">🔒</div>
-                    <div>
-                        <div class="card-header-title">Security Tips</div>
-                        <div class="card-header-sub">Keep your account safe</div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div style="display:flex; flex-direction:column; gap:18px;">
-
-                        <div style="display:flex; gap:13px; align-items:flex-start;">
-                            <div style="width:36px;height:36px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">🔑</div>
-                            <div>
-                                <div style="font-size:0.82rem;font-weight:700;color:#143b27;margin-bottom:3px;">Use a strong password</div>
-                                <div style="font-size:0.75rem;color:#4a745c;line-height:1.55;">Mix uppercase, lowercase, numbers and symbols. Aim for at least 10 characters.</div>
-                            </div>
-                        </div>
-
-                        <div style="display:flex; gap:13px; align-items:flex-start;">
-                            <div style="width:36px;height:36px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">🔄</div>
-                            <div>
-                                <div style="font-size:0.82rem;font-weight:700;color:#143b27;margin-bottom:3px;">Change passwords regularly</div>
-                                <div style="font-size:0.75rem;color:#4a745c;line-height:1.55;">Update your password every few months to reduce risk of unauthorized access.</div>
-                            </div>
-                        </div>
-
-                        <div style="display:flex; gap:13px; align-items:flex-start;">
-                            <div style="width:36px;height:36px;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">🚫</div>
-                            <div>
-                                <div style="font-size:0.82rem;font-weight:700;color:#143b27;margin-bottom:3px;">Don't reuse passwords</div>
-                                <div style="font-size:0.75rem;color:#4a745c;line-height:1.55;">Avoid using the same password across different accounts or systems.</div>
-                            </div>
-                        </div>
-
-                        <div style="display:flex; gap:13px; align-items:flex-start;">
-                            <div style="width:36px;height:36px;background:#fdf4ff;border:1.5px solid #e9d5ff;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">🖥️</div>
-                            <div>
-                                <div style="font-size:0.82rem;font-weight:700;color:#143b27;margin-bottom:3px;">Log out on shared devices</div>
-                                <div style="font-size:0.75rem;color:#4a745c;line-height:1.55;">Always sign out when using a shared or public computer to protect your data.</div>
-                            </div>
-                        </div>
-
-                    </div>
                 </div>
             </div>
 

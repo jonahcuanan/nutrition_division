@@ -1,4 +1,20 @@
 document.addEventListener("DOMContentLoaded", function () {
+    const welcomeNameEl = document.getElementById('welcomeName');
+    function updateWelcomeName(name) {
+        if (!welcomeNameEl) return;
+        const cleaned = (name || '').trim();
+        if (cleaned !== '') welcomeNameEl.textContent = cleaned;
+    }
+
+    const storedName = localStorage.getItem('display_name');
+    if (storedName) updateWelcomeName(storedName);
+
+    window.addEventListener('storage', (event) => {
+        if (event.key === 'display_name') {
+            updateWelcomeName(event.newValue || '');
+        }
+    });
+
     // Shared options
     const fontOpts = { family: "'Plus Jakarta Sans', sans-serif" };
     const commonColors = ['#2ea86a', '#1a6ed8', '#e5a200', '#2aa7a0', '#6b58d6', '#e05252'];

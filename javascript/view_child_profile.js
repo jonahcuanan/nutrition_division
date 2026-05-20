@@ -12,15 +12,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const wfaChild = records
         .filter(r => r.age_in_months !== null && r.weight !== null)
-        .map(r => ({ x: Number(r.age_in_months), y: Number(r.weight) }));
+        .map(r => ({ x: Number(r.age_in_months), y: Number(r.weight), status: r.weight_for_age_status }));
 
     const hfaChild = records
         .filter(r => r.age_in_months !== null && r.height !== null)
-        .map(r => ({ x: Number(r.age_in_months), y: Number(r.height) }));
+        .map(r => ({ x: Number(r.age_in_months), y: Number(r.height), status: r.height_for_age_status }));
 
     const wflChild = records
         .filter(r => r.height !== null && r.weight !== null)
-        .map(r => ({ x: Number(r.height), y: Number(r.weight) }));
+        .map(r => ({ x: Number(r.height), y: Number(r.weight), status: r.weight_for_ltht_status }));
 
     const baseOpts = {
         responsive: true,
@@ -83,6 +83,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         callbacks: {
                             label: (ctx) => {
                                 const val = typeof ctx.parsed.y === 'number' ? ctx.parsed.y.toFixed(1) : ctx.parsed.y;
+                                if (ctx.dataset.label === 'Child' && ctx.raw && ctx.raw.status) {
+                                    const unit = yTitle.includes('(kg)') ? ' kg' : (yTitle.includes('(cm)') ? ' cm' : '');
+                                    return `${val}${unit} (${ctx.raw.status})`;
+                                }
                                 return `${ctx.dataset.label}: ${val}`;
                             }
                         }

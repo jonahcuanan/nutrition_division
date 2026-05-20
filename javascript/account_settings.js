@@ -91,6 +91,91 @@ function initAccountSettings() {
     const userSuffix     = document.getElementById('userSuffix');
     const userIdInput    = document.getElementById('userIdInput');
     const generateUserIdBtn = document.getElementById('generateUserIdBtn');
+    const myAccountForm = document.getElementById('myAccountForm');
+
+    if (myAccountForm) {
+        myAccountForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(myAccountForm);
+            formData.append('ajax', '1');
+
+            try {
+                const res = await fetch('account_settings.php', {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('success', data.message || 'Account updated successfully.');
+                    if (data.display_name) {
+                        localStorage.setItem('display_name', data.display_name);
+                    }
+                    if (data.fields) {
+                        if (myAccountForm.elements.first_name) myAccountForm.elements.first_name.value = data.fields.first_name || '';
+                        if (myAccountForm.elements.middle_name) myAccountForm.elements.middle_name.value = data.fields.middle_name || '';
+                        if (myAccountForm.elements.last_name) myAccountForm.elements.last_name.value = data.fields.last_name || '';
+                        if (myAccountForm.elements.suffix) myAccountForm.elements.suffix.value = data.fields.suffix || '';
+                        if (myAccountForm.elements.email) myAccountForm.elements.email.value = data.fields.email || '';
+                    }
+                    if (myAccountForm.elements.password) myAccountForm.elements.password.value = '';
+                    if (myAccountForm.elements.confirm_password) myAccountForm.elements.confirm_password.value = '';
+                } else {
+                    showToast('error', data.message || 'Unable to update account.');
+                }
+            } catch (err) {
+                showToast('error', 'Network error. Please try again.');
+            }
+        });
+
+        const myFirst = myAccountForm.querySelector('input[name="first_name"]');
+        const myLast = myAccountForm.querySelector('input[name="last_name"]');
+        const myUserId = document.getElementById('myCurrentUserId');
+
+        async function checkDuplicateName() {
+            if (!myFirst || !myLast) return;
+            const first = myFirst.value.trim();
+            const last = myLast.value.trim();
+            if (first === '' || last === '') return;
+
+            const formData = new FormData();
+            formData.append('first_name', first);
+            formData.append('last_name', last);
+            if (myUserId && myUserId.value) formData.append('exclude_user_id', myUserId.value);
+
+            try {
+                const res = await fetch('account_settings.php?action=check_name_exists', {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await res.json();
+                const fieldEl = myLast.closest('.field');
+                if (!fieldEl) return;
+                if (data.exists) {
+                    setFieldState(fieldEl, 'error');
+                    showInlineError(fieldEl, data.message || 'Name already exists.');
+                } else {
+                    clearFieldState(fieldEl);
+                    hideInlineError(fieldEl);
+                }
+            } catch (err) {
+                // Ignore network errors for inline checks
+            }
+        }
+
+        if (myFirst) myFirst.addEventListener('blur', checkDuplicateName);
+        if (myLast) myLast.addEventListener('blur', checkDuplicateName);
+        if (myFirst) myFirst.addEventListener('input', () => {
+            const fieldEl = myLast?.closest('.field');
+            if (fieldEl) hideInlineError(fieldEl);
+        });
+        if (myLast) myLast.addEventListener('input', () => {
+            const fieldEl = myLast.closest('.field');
+            if (fieldEl) hideInlineError(fieldEl);
+        });
+    }
 
     // ── Modal open / close ──────────────────────
     window.openModal = function () {

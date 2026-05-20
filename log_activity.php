@@ -20,6 +20,8 @@ $allowedActivities = [
     'generate_report',
     'add_profile',
     'edit_profile',
+    'update_measurement',
+    'update_muac',
     'change_password',
     'login',
     'logout',

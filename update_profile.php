@@ -127,12 +127,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Handle measurement update if mode is 'measurement' or 'both'
     $measurementRecorded = false;
-    $detailParts = [];
     $logFirst  = isset($upd_first_name) ? $upd_first_name : ($childRow['first_name'] ?? '');
     $logMid    = $childRow['middle_name'] ?? '';
     $logLast   = isset($upd_last_name)  ? $upd_last_name  : ($childRow['last_name']  ?? '');
     $childFullName = implode(' ', array_filter([$logFirst, $logMid, $logLast]));
-    $detailParts[] = 'Child: ' . ($childFullName !== '' ? $childFullName : ('Child #' . $child_id));
+    $baseDetail = 'Child: ' . ($childFullName !== '' ? $childFullName : ('Child #' . $child_id));
+    $profileDetailParts = [$baseDetail];
+    $measurementDetailParts = [$baseDetail];
 
     $isMeasurementMode = ($update_mode === 'measurement' || $update_mode === 'muac' || $update_mode === 'both');
     if ($isMeasurementMode) {
@@ -304,7 +305,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($measurementRecorded) {
             $muacPart = ($muac > 0) ? (', MUAC ' . number_format((float)$muac, 1) . ' cm') : '';
-            $detailParts[] = 'Measurement: ' . $measurement_date . ', H ' . number_format((float)$height, 1) . ' cm, W ' . number_format((float)$weight, 1) . ' kg' . $muacPart . ', Age ' . (int)$age_in_months . ' mo';
+            $measurementDetailParts[] = 'Measurement: ' . $measurement_date . ', H ' . number_format((float)$height, 1) . ' cm, W ' . number_format((float)$weight, 1) . ' kg' . $muacPart . ', Age ' . (int)$age_in_months . ' mo';
         }
     }
 
@@ -327,12 +328,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $compare('IP', $originalChild['is_ip'], $_POST['is_ip'] ?? null);
 
         if (!empty($changes)) {
-            $detailParts = array_merge($detailParts, $changes);
+            $profileDetailParts = array_merge($profileDetailParts, $changes);
         }
     }
 
+    if ($profileUpdated) {
+        log_user_activity($conn, (int)$_SESSION['user_id'], 'edit_profile', implode(' | ', $profileDetailParts));
+    }
+
+    if ($measurementRecorded) {
+        $measurementActivityType = ($update_mode === 'muac') ? 'update_muac' : 'update_measurement';
+        log_user_activity($conn, (int)$_SESSION['user_id'], $measurementActivityType, implode(' | ', $measurementDetailParts));
+    }
+
     if ($profileUpdated || $measurementRecorded) {
-        log_user_activity($conn, (int)$_SESSION['user_id'], 'edit_profile', implode(' | ', $detailParts));
 
         // Fetch the COMPLETE latest state to return to the frontend
         $finalSql = "SELECT gr.*, c.first_name, c.last_name, c.address, c.sex, c.birthdate, c.is_ip, 

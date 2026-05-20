@@ -47,8 +47,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         pending = setTimeout(() => {
-            const body = new URLSearchParams({ pin });
-            fetch('check_reset_pin.php', {
+            const body = new URLSearchParams({ action: 'ajax_check_pin', pin });
+            fetch('forgot_password.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: body.toString()

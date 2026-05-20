@@ -397,7 +397,7 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
                     <span class="welcome-role"><?= htmlspecialchars($_SESSION['role']) ?></span>
                     <span id="philippineClock" style="font-weight: 700; color: var(--red-500); background: rgba(224, 82, 82, 0.08); padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(224, 82, 82, 0.2); font-size: 0.85rem; letter-spacing: 0.04em;"></span>
                 </div>
-                <h2>Welcome back, <?= htmlspecialchars($displayName) ?>!</h2>
+                <h2>Welcome back, <span id="welcomeName"><?= htmlspecialchars($displayName) ?></span>!</h2>
                 <p>
                     <?php if ($userBarangayName): ?>
                         Data overview for your contributions in <strong>Barangay <?= htmlspecialchars($userBarangayName) ?></strong>

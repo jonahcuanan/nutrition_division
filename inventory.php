@@ -470,13 +470,15 @@ if ($invResult && $invResult->num_rows > 0) {
 $logRows = [];
 $logsResult = null;
 if ($inventoryLogRefColumn !== null) {
-    $logsResult = $conn->query("SELECT il.{$inventoryLogRefColumn} AS inventory_ref_id, i.item_name, il.child_id, c.first_name, c.middle_name, c.last_name, c.suffix, il.transaction_type, il.quantity, il.transaction_date, il.remarks
+    $logsResult = $conn->query("SELECT il.{$inventoryLogRefColumn} AS inventory_ref_id, i.item_name, il.child_id, c.first_name, c.middle_name, c.last_name, c.suffix, c.barangay_id, b.barangay_name AS barangay_name, il.transaction_type, il.quantity, il.transaction_date, il.remarks
         FROM inventory_logs il
         LEFT JOIN inventory i ON il.{$inventoryLogRefColumn} = i.inventory_id
-        LEFT JOIN children c ON il.child_id = c.child_id");
+        LEFT JOIN children c ON il.child_id = c.child_id
+        LEFT JOIN barangays b ON c.barangay_id = b.barangay_id");
 }
 if ($logsResult && $logsResult->num_rows > 0) {
     while ($log = $logsResult->fetch_assoc()) {
+        $log['barangay'] = $log['barangay_name'] ?? '';
         $logRows[] = $log;
     }
 }
@@ -497,12 +499,13 @@ if ($stmtGiveOut) {
 
 if ($giveOutTypeId !== null) {
     $stmtGiveOutLogs = $conn->prepare(
-        'SELECT inv.item_name, i.child_id, c.first_name, c.middle_name, c.last_name, c.suffix,
+        'SELECT inv.item_name, i.child_id, c.first_name, c.middle_name, c.last_name, c.suffix, c.barangay_id, b.barangay_name AS barangay_name,
                 ii.quantity_given AS quantity, i.intervention_date, i.description
          FROM interventions i
          INNER JOIN intervention_items ii ON ii.intervention_id = i.intervention_id
          LEFT JOIN inventory inv ON inv.inventory_id = ii.inventory_id
          LEFT JOIN children c ON c.child_id = i.child_id
+         LEFT JOIN barangays b ON c.barangay_id = b.barangay_id
          WHERE i.type_id = ?'
     );
     if ($stmtGiveOutLogs) {
@@ -517,6 +520,7 @@ if ($giveOutTypeId !== null) {
                 'middle_name' => $row['middle_name'] ?? null,
                 'last_name' => $row['last_name'] ?? null,
                 'suffix' => $row['suffix'] ?? null,
+                'barangay' => $row['barangay_name'] ?? '',
                 'transaction_type' => 'GIVE OUT (INTERVENTION)',
                 'quantity' => $row['quantity'] ?? 0,
                 'transaction_date' => ($row['intervention_date'] ?? '') !== ''
@@ -550,6 +554,28 @@ foreach ($logRows as $log) {
 if (!empty($logMonths)) {
     krsort($logMonths);
 }
+
+// Build unique barangays, years, and item names for filters
+$barangays = [];
+$years = [];
+$itemsForFilter = [];
+foreach ($logRows as $log) {
+    $b = trim((string)($log['barangay'] ?? ''));
+    if ($b !== '') $barangays[$b] = $b;
+    if (!empty($log['transaction_date'])) {
+        $ts = strtotime($log['transaction_date']);
+        if ($ts !== false) {
+            $y = date('Y', $ts);
+            $years[$y] = $y;
+        }
+    }
+    $iname = trim((string)($log['item_name'] ?? ''));
+    if ($iname !== '') $itemsForFilter[$iname] = $iname;
+}
+
+ksort($barangays);
+krsort($years);
+ksort($itemsForFilter);
 
 $totalItems = count($inventoryItems);
 $lowStock = 0; $expiringSoon = 0; $totalStock = 0; 
@@ -880,10 +906,37 @@ if ($stmtCat) {
                 <div class="dist-search">
                     <input type="text" id="distSearch" class="dist-search-input" placeholder="Search item, child, notes...">
                 </div>
+                <select id="distBarangayFilter" class="filter-select">
+                    <option value="">All barangays</option>
+                    <?php foreach ($barangays as $b): ?>
+                        <option value="<?= htmlspecialchars($b) ?>"><?= htmlspecialchars($b) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <select id="distYearFilter" class="filter-select">
+                    <option value="">All years</option>
+                    <?php foreach ($years as $y): ?>
+                        <option value="<?= htmlspecialchars($y) ?>"><?= htmlspecialchars($y) ?></option>
+                    <?php endforeach; ?>
+                </select>
                 <select id="distMonthFilter" class="filter-select">
                     <option value="">All months</option>
-                    <?php foreach ($logMonths as $key => $label): ?>
-                        <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($label) ?></option>
+                    <option value="01">January</option>
+                    <option value="02">February</option>
+                    <option value="03">March</option>
+                    <option value="04">April</option>
+                    <option value="05">May</option>
+                    <option value="06">June</option>
+                    <option value="07">July</option>
+                    <option value="08">August</option>
+                    <option value="09">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                </select>
+                <select id="distItemFilter" class="filter-select">
+                    <option value="">All items</option>
+                    <?php foreach ($itemsForFilter as $it): ?>
+                        <option value="<?= htmlspecialchars($it) ?>"><?= htmlspecialchars($it) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -894,6 +947,7 @@ if ($stmtCat) {
                 <tr>
                     <th>Item Given</th>
                     <th>Given To (Child)</th>
+                    <th>Barangay</th>
                     <th class="center">Qty Given</th>
                     <th>Date</th>
                     <th>Time</th>
@@ -906,14 +960,16 @@ if ($stmtCat) {
                     $txDate = $log['transaction_date'] ? date('M d, Y', strtotime($log['transaction_date'])) : '—';
                     $txTime = $log['transaction_date'] ? date('g:i A', strtotime($log['transaction_date'])) : '—';
                     $txMonth = $log['transaction_date'] ? date('Y-m', strtotime($log['transaction_date'])) : '';
+                    $txYear = $log['transaction_date'] ? date('Y', strtotime($log['transaction_date'])) : '';
                     $n = trim(($log['first_name']??'').' '.($log['middle_name']??'').' '.($log['last_name']??''));
                     if (!empty($log['suffix'])) $n .= ' '.$log['suffix'];
                     $childLabel = $log['child_id']!==null ? ($n?:'Child #'.(int)$log['child_id']) : '—';
-                    $searchText = strtolower(trim(($log['item_name'] ?? '') . ' ' . $childLabel . ' ' . ($log['remarks'] ?? '')));
+                        $searchText = strtolower(trim(($log['item_name'] ?? '') . ' ' . $childLabel . ' ' . ($log['barangay'] ?? '') . ' ' . ($log['remarks'] ?? '')));
             ?>
-            <tr data-month="<?= htmlspecialchars($txMonth) ?>" data-search="<?= htmlspecialchars($searchText) ?>">
+                    <tr data-month="<?= htmlspecialchars($txMonth) ?>" data-year="<?= htmlspecialchars($txYear) ?>" data-barangay="<?= htmlspecialchars($log['barangay'] ?? '') ?>" data-item="<?= htmlspecialchars($log['item_name'] ?? '') ?>" data-search="<?= htmlspecialchars($searchText) ?>">
                 <td data-label="Item" style="font-weight:600;color:#111827;"><?= htmlspecialchars($log['item_name']??'—') ?></td>
                 <td data-label="Child" style="color:#374151;"><?= htmlspecialchars($childLabel) ?></td>
+                <td data-label="Barangay" style="color:#374151;"><?= htmlspecialchars($log['barangay'] ?? '—') ?></td>
                 <td data-label="Qty" style="text-align:center;"><span class="badge badge-blue"><?= htmlspecialchars($log['quantity']) ?></span></td>
                 <td data-label="Date" style="font-size:0.82rem;color:#374151;"><?= $txDate ?></td>
                 <td data-label="Time" style="font-size:0.82rem;color:#6b7280;"><?= $txTime ?></td>
@@ -922,7 +978,7 @@ if ($stmtCat) {
             <?php endforeach;
             ?>
             <tr id="distNoResults" style="display:none;">
-                <td colspan="6" class="empty-cell">
+                <td colspan="7" class="empty-cell">
                     <div class="empty-state">
                         <div class="empty-icon">📅</div>
                         <h3>No records for that month</h3>
@@ -932,7 +988,7 @@ if ($stmtCat) {
             </tr>
             <?php
             else: ?>
-            <tr><td colspan="6" class="empty-cell">
+            <tr><td colspan="7" class="empty-cell">
                 <div class="empty-state">
                     <div class="empty-icon">📜</div>
                     <h3>No distributions yet</h3>

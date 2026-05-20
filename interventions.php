@@ -397,6 +397,8 @@ function load_intervention_children(mysqli $conn): array
         $children[] = [
             'child_id'               => (int)$row['child_id'],
             'name'                   => $name,
+            'address'                => $row['address'] ?? '—',
+            'barangay_name'          => $row['barangay_name'] ?? '—',
             'address_location'       => $addressLocation,
             'sex'                    => !empty($row['sex']) ? (string)$row['sex'] : 'N/A',
             'weight'                 => $row['weight'] !== null ? (float)$row['weight'] : null,
@@ -407,6 +409,7 @@ function load_intervention_children(mysqli $conn): array
             'weight_for_ltht_status' => $statuses['weight_for_ltht_status'] ?? 'N/A',
             'is_eligible'            => $isEligible,
             'measurement_status'     => $measurementStatus,
+            'measurement_date'       => $row['measurement_date'] ?? '—',
         ];
     }
 
@@ -1563,14 +1566,16 @@ function child_label(array $child): string {
                             <thead>
                                 <tr>
                                         <th style="width:44px;">Select</th>
-                                        <th style="width:16%; text-align:left;">Address / Location</th>
-                                        <th style="width:15%; text-align:left;">Full Name</th>
-                                        <th style="width:6%;"><span class="child-table-header"><span class="top">Sex</span></span></th>
-                                        <th style="width:7%;"><span class="child-table-header"><span class="top">Age</span><span class="bottom">(months)</span></span></th>
-                                        <th style="width:10%;"><span class="child-table-header"><span class="top">Measurement</span><span class="bottom">Status</span></span></th>
-                                        <th style="width:11%;"><span class="child-table-header"><span class="top">Height for Age</span><span class="bottom">Status</span></span></th>
-                                        <th style="width:11%;"><span class="child-table-header"><span class="top">Weight for Age</span><span class="bottom">Status</span></span></th>
-                                        <th style="width:11%;"><span class="child-table-header"><span class="top">Weight for Ht/L</span><span class="bottom">Status</span></span></th>
+                                        <th style="width:12%; text-align:left;">Address</th>
+                                        <th style="width:10%; text-align:left;">Barangay</th>
+                                        <th style="width:12%; text-align:left;">Full Name</th>
+                                        <th style="width:5%;"><span class="child-table-header"><span class="top">Sex</span></span></th>
+                                        <th style="width:6%;"><span class="child-table-header"><span class="top">Age</span><span class="bottom">(months)</span></span></th>
+                                        <th style="width:10%;"><span class="child-table-header"><span class="top">Measurement</span><span class="bottom">Date</span></span></th>
+                                        <th style="width:9%;"><span class="child-table-header"><span class="top">Measurement</span><span class="bottom">Status</span></span></th>
+                                        <th style="width:9%;"><span class="child-table-header"><span class="top">Height for Age</span><span class="bottom">Status</span></span></th>
+                                        <th style="width:9%;"><span class="child-table-header"><span class="top">Weight for Age</span><span class="bottom">Status</span></span></th>
+                                        <th style="width:9%;"><span class="child-table-header"><span class="top">Weight for Ht/L</span><span class="bottom">Status</span></span></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1579,7 +1584,9 @@ function child_label(array $child): string {
                                         <?php
                                             $searchText = strtolower(trim(
                                                 ($child['name'] ?? '') . ' ' .
-                                                ($child['address_location'] ?? '') . ' ' .
+                                                ($child['address'] ?? '') . ' ' .
+                                                ($child['barangay_name'] ?? '') . ' ' .
+                                                ($child['measurement_date'] ?? '') . ' ' .
                                                 ($child['sex'] ?? '') . ' ' .
                                                 ($child['measurement_status'] ?? '') . ' ' .
                                                 ($child['weight_for_age_status'] ?? '') . ' ' .
@@ -1588,12 +1595,15 @@ function child_label(array $child): string {
                                             ));
                                             $rowClass = !empty($child['is_eligible']) ? '' : ' is-hidden';
                                         ?>
-                                        <tr class="child-check-row child-profile-row<?= $rowClass ?>" data-child-id="<?= (int)$child['child_id'] ?>" data-search="<?= htmlspecialchars($searchText) ?>" data-eligible="<?= !empty($child['is_eligible']) ? '1' : '0' ?>">
+                                        <tr class="child-check-row child-profile-row<?= $rowClass ?>" data-child-id="<?= (int)$child['child_id'] ?>" data-search="<?= htmlspecialchars($searchText) ?>" data-eligible="<?= !empty($child['is_eligible']) ? '1' : '0' ?>" data-measurement-date="<?= htmlspecialchars($child['measurement_date'] ?? '') ?>">
                                             <td class="child-check-cell">
                                                 <input type="checkbox" name="child_ids[]" value="<?= (int)$child['child_id'] ?>">
                                             </td>
-                                            <td class="child-location-cell">
-                                                <?= htmlspecialchars($child['address_location'] ?? '—') ?>
+                                            <td class="child-location-cell" title="<?= htmlspecialchars($child['address'] ?? '—') ?>">
+                                                <?= htmlspecialchars($child['address'] ?? '—') ?>
+                                            </td>
+                                            <td class="child-barangay-cell" title="<?= htmlspecialchars($child['barangay_name'] ?? '—') ?>">
+                                                <?= htmlspecialchars($child['barangay_name'] ?? '—') ?>
                                             </td>
                                             <td class="child-name-cell">
                                                 <?= htmlspecialchars($child['name'] ?? '—') ?>
@@ -1603,6 +1613,9 @@ function child_label(array $child): string {
                                             </td>
                                             <td class="child-age-cell">
                                                 <?= $child['age_in_months'] !== null ? htmlspecialchars((string)$child['age_in_months']) : 'N/A' ?>
+                                            </td>
+                                            <td class="child-date-cell">
+                                                <?= htmlspecialchars($child['measurement_date'] ?? '—') ?>
                                             </td>
                                             <td class="child-status-cell">
                                                 <?php 
@@ -1629,7 +1642,7 @@ function child_label(array $child): string {
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="9" class="empty-state" style="padding:28px 16px;">
+                                        <td colspan="11" class="empty-state" style="padding:28px 16px;">
                                             <div class="empty-title">No children found</div>
                                             <div class="empty-sub">There are no active children right now.</div>
                                         </td>

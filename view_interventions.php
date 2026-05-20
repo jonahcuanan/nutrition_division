@@ -290,6 +290,7 @@ if ($stmt) {
             'weight_for_ltht_status' => $statuses['weight_for_ltht_status'] ?? 'N/A',
             'given_items' => $r['given_items'] ?? '',
             'given_qtys' => $r['given_qtys'] ?? '',
+            'measurement_date' => $r['measurement_date'] ?? '—',
         ];
     }
     $stmt->close();
@@ -376,17 +377,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'edit
 }
 
 $childCount = count($children);
-$monthOptions = [];
+
+// Build year options
+$yearOptions = [];
 foreach ($children as $child) {
     $dateVal = $child['date'] ?? '';
-    if (!$dateVal || $dateVal === '—' || strlen($dateVal) < 7) {
-        continue;
-    }
-    $monthKey = substr($dateVal, 0, 7);
-    $monthOptions[$monthKey] = true;
+    if (!$dateVal || $dateVal === '—' || strlen($dateVal) < 4) continue;
+    $yr = substr($dateVal, 0, 4);
+    $yearOptions[$yr] = true;
 }
-$monthOptions = array_keys($monthOptions);
-rsort($monthOptions);
+$yearOptions = array_keys($yearOptions);
+rsort($yearOptions);
+
+// Build barangay options
+$barangayOptions = [];
+foreach ($children as $child) {
+    $br = trim((string)($child['barangay'] ?? ''));
+    if ($br !== '' && $br !== 'N/A') {
+        $barangayOptions[$br] = true;
+    }
+}
+$barangayOptions = array_keys($barangayOptions);
+sort($barangayOptions);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -486,9 +498,10 @@ rsort($monthOptions);
         .modal-body { padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
         .field-grid { display:grid; grid-template-columns:1fr 180px; gap:10px; }
         .field-label { font-size:11px; font-weight:700; color:#64748b; margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em; }
-        .field-input, .field-textarea {
+
+        .field-input, .field-textarea, #filterSearch {
             width:100%; border:1px solid #cbd5e1; border-radius:8px; background:#fff;
-            padding:8px 10px; font-size:12px; color:#0f172a;
+            padding:8px 10px; font-size:12px; color:#000000 !important; font-weight:500;
         }
         .field-textarea { min-height:80px; resize:vertical; }
         .child-grid { display:grid; gap:6px; max-height:280px; overflow:auto; border:1px solid #e2e8f0; border-radius:10px; padding:8px; }
@@ -548,39 +561,104 @@ rsort($monthOptions);
     </div>
 
     <div class="page-card">
-        <div style="padding:16px 20px;border-bottom:1px solid #f1f5f9;display:flex;flex-direction:column;gap:12px;">
-            <div>
-                <div class="view-detail-label">Children</div>
-                <div class="view-detail-value"><?= $childCount ?> child<?= $childCount !== 1 ? 'ren' : '' ?></div>
-            </div>
-            <div>
-                <div class="view-detail-label" style="margin-bottom:6px;">Filters</div>
-                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+        <div style="padding:16px 20px;border-bottom:1px solid #f1f5f9;display:flex;flex-direction:column;gap:14px;">
+
+            <!-- Count + Search row -->
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:38px;height:38px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;font-size:18px;">👶</div>
                     <div>
-                        <div class="view-detail-label" style="margin-bottom:4px;">Month</div>
-                        <select id="filterMonth" class="field-input" style="min-width:160px;">
-                            <option value="">All months</option>
-                            <?php foreach ($monthOptions as $month): ?>
-                                <option value="<?= htmlspecialchars($month) ?>"><?= htmlspecialchars($month) ?></option>
+                        <div class="view-detail-label" style="margin-bottom:1px;">Total Children</div>
+                        <div style="font-size:20px;font-weight:800;color:#0f172a;line-height:1;"><?= $childCount ?></div>
+                    </div>
+                </div>
+                <!-- Search bar -->
+                <div style="position:relative;flex:1;min-width:220px;max-width:360px;">
+                    <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;" width="15" height="15" fill="none" stroke="#94a3b8" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input id="filterSearch" type="text" placeholder="Search by name, address…" style="width:100%;padding:8px 10px 8px 32px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:12px;color:#0f172a;background:#f8fafc;outline:none;transition:border .2s;" onfocus="this.style.borderColor='#2563eb'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+            </div>
+
+            <!-- Filters row -->
+            <div style="background-color: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 16px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                    <svg width="13" height="13" fill="none" stroke="#64748b" stroke-width="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                    <span class="view-detail-label" style="margin-bottom:0;">Filters</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+
+                    <!-- Year -->
+                    <div>
+                        <div class="view-detail-label" style="margin-bottom:4px;">Year</div>
+                        <select id="filterYear" class="field-input" style="min-width:100px;">
+                            <option value="">All years</option>
+                            <?php foreach ($yearOptions as $yr): ?>
+                                <option value="<?= htmlspecialchars($yr) ?>"><?= htmlspecialchars($yr) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
+
+                    <!-- Month -->
+                    <div>
+                        <div class="view-detail-label" style="margin-bottom:4px;">Month</div>
+                        <select id="filterMonth" class="field-input" style="min-width:130px;">
+                            <option value="">All months</option>
+                            <option value="01">January</option>
+                            <option value="02">February</option>
+                            <option value="03">March</option>
+                            <option value="04">April</option>
+                            <option value="05">May</option>
+                            <option value="06">June</option>
+                            <option value="07">July</option>
+                            <option value="08">August</option>
+                            <option value="09">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+
+                    <!-- Barangay -->
+                    <div>
+                        <div class="view-detail-label" style="margin-bottom:4px;">Barangay</div>
+                        <select id="filterBarangay" class="field-input" style="min-width:160px;">
+                            <option value="">All barangays</option>
+                            <?php foreach ($barangayOptions as $br): ?>
+                                <option value="<?= htmlspecialchars($br) ?>"><?= htmlspecialchars($br) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <!-- Sex -->
                     <div>
                         <div class="view-detail-label" style="margin-bottom:4px;">Sex</div>
-                        <select id="filterSex" class="field-input" style="min-width:120px;">
+                        <select id="filterSex" class="field-input" style="min-width:110px;">
                             <option value="">All</option>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                         </select>
                     </div>
+
+                    <!-- Age Min -->
                     <div>
-                        <div class="view-detail-label" style="margin-bottom:4px;">Age Min (months)</div>
-                        <input id="filterAgeMin" class="field-input" type="number" min="0" placeholder="Any" style="width:140px;">
+                        <div class="view-detail-label" style="margin-bottom:4px;">Age Min (mos.)</div>
+                        <input id="filterAgeMin" class="field-input" type="number" min="0" placeholder="Any" style="width:110px;">
                     </div>
+
+                    <!-- Age Max -->
                     <div>
-                        <div class="view-detail-label" style="margin-bottom:4px;">Age Max (months)</div>
-                        <input id="filterAgeMax" class="field-input" type="number" min="0" placeholder="Any" style="width:140px;">
+                        <div class="view-detail-label" style="margin-bottom:4px;">Age Max (mos.)</div>
+                        <input id="filterAgeMax" class="field-input" type="number" min="0" placeholder="Any" style="width:110px;">
                     </div>
+
+                    <!-- Reset button -->
+                    <div>
+                        <button type="button" id="btnResetFilters" class="h-9 inline-flex items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-4 text-[0.8rem] font-semibold text-rose-600 shadow-sm hover:bg-rose-100 transition-colors" style="cursor:pointer; font-family:inherit;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                            Reset
+                        </button>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -613,31 +691,33 @@ rsort($monthOptions);
                         <thead>
                             <tr>
                                 <?php if ($isGiveOut): ?>
+                                <th style="width:7%;">Address</th>
+                                <th style="width:7%;">Barangay</th>
+                                <th style="width:9%;">Full Name</th>
+                                <th style="width:3%;">Sex</th>
+                                <th style="width:3%;">Age</th>
+                                <th style="width:8%;">Measurement Date</th>
+                                <th style="width:5%;">Height<br>for Age<br>Status</th>
+                                <th style="width:5%;">Weight<br>for Age<br>Status</th>
+                                <th style="width:5%;">Weight<br>for L/HT<br>Status</th>
+                                <th style="width:5%;">Date</th>
+                                <th style="width:9%;">What Given</th>
+                                <th style="width:3%;">Qty</th>
+                                <th style="width:17%;">Notes</th>
+                                <th style="width:5%;">Action</th>
+                                <?php else: ?>
                                 <th style="width:8%;">Address</th>
                                 <th style="width:8%;">Barangay</th>
                                 <th style="width:10%;">Full Name</th>
-                                <th style="width:4%;">Sex</th>
-                                <th style="width:4%;">Age</th>
-                                <th style="width:6%;">HA Status</th>
-                                <th style="width:6%;">WA Status</th>
-                                <th style="width:6%;">WL Status</th>
+                                <th style="width:3%;">Sex</th>
+                                <th style="width:3%;">Age</th>
+                                <th style="width:10%;">Measurement Date</th>
+                                <th style="width:6%;">Height<br>for Age<br>Status</th>
+                                <th style="width:6%;">Weight<br>for Age<br>Status</th>
+                                <th style="width:6%;">Weight<br>for L/HT<br>Status</th>
                                 <th style="width:6%;">Date</th>
-                                <th style="width:10%;">What Given</th>
-                                <th style="width:4%;">Qty</th>
-                                <th style="width:22%;">Notes</th>
-                                <th style="width:10%;">Action</th>
-                                <?php else: ?>
-                                <th style="width:10%;">Address</th>
-                                <th style="width:10%;">Barangay</th>
-                                <th style="width:12%;">Full Name</th>
-                                <th style="width:4%;">Sex</th>
-                                <th style="width:4%;">Age</th>
-                                <th style="width:7%;">HA Status</th>
-                                <th style="width:7%;">WA Status</th>
-                                <th style="width:7%;">WL Status</th>
-                                <th style="width:7%;">Date</th>
-                                <th style="width:20%;">Notes</th>
-                                <th style="width:10%;">Action</th>
+                                <th style="width:16%;">Notes</th>
+                                <th style="width:6%;">Action</th>
                                 <?php endif; ?>
                             </tr>
                         </thead>
@@ -645,14 +725,24 @@ rsort($monthOptions);
                             <?php if (!empty($children)): ?>
                                 <?php foreach ($children as $child): ?>
                                     <?php
-                                        $rowMonth = '';
+                                        $rowYear = '';
+                                        $rowMonthNum = '';
                                         if (!empty($child['date']) && $child['date'] !== '—' && strlen($child['date']) >= 7) {
-                                            $rowMonth = substr($child['date'], 0, 7);
+                                            $rowYear = substr($child['date'], 0, 4);
+                                            $rowMonthNum = substr($child['date'], 5, 2);
                                         }
                                         $rowAge = is_numeric($child['age_in_months']) ? (string)$child['age_in_months'] : '';
+                                        $rowBarangay = trim((string)($child['barangay'] ?? ''));
                                     ?>
                                     <tr class="child-profile-row" data-child-id="<?= (int)$child['child_id'] ?>">
-                                        <td class="location-cell" data-month="<?= htmlspecialchars($rowMonth) ?>" data-sex="<?= htmlspecialchars($child['sex']) ?>" data-age="<?= htmlspecialchars($rowAge) ?>">
+                                        <td class="location-cell"
+                                            data-year="<?= htmlspecialchars($rowYear) ?>"
+                                            data-month="<?= htmlspecialchars($rowMonthNum) ?>"
+                                            data-sex="<?= htmlspecialchars($child['sex']) ?>"
+                                            data-age="<?= htmlspecialchars($rowAge) ?>"
+                                            data-barangay="<?= htmlspecialchars($rowBarangay) ?>"
+                                            data-name="<?= htmlspecialchars(strtolower($child['name'] ?? '')) ?>"
+                                            data-address="<?= htmlspecialchars(strtolower($child['address'] ?? '')) ?>">
                                             <div title="<?= htmlspecialchars($child['address']) ?>"><?= htmlspecialchars($child['address']) ?></div>
                                         </td>
                                         <td class="location-cell">
@@ -661,6 +751,7 @@ rsort($monthOptions);
                                         <td class="name-cell"><div title="<?= htmlspecialchars($child['name']) ?>"><?= htmlspecialchars($child['name']) ?></div></td>
                                         <td class="sex-cell"><?= htmlspecialchars($child['sex']) ?></td>
                                         <td class="metric-cell"><?= htmlspecialchars($child['age_in_months']) ?></td>
+                                        <td class="metric-cell" style="white-space:nowrap;"><?= htmlspecialchars($child['measurement_date'] ?? '—') ?></td>
                                         <td class="status-cell <?= htmlspecialchars(status_cell_class($child['height_for_age_status'])) ?>" title="<?= htmlspecialchars($child['height_for_age_status']) ?>">
                                             <?= htmlspecialchars(status_abbrev($child['height_for_age_status'])) ?>
                                         </td>
@@ -691,7 +782,21 @@ rsort($monthOptions);
                                             <?php endif; ?>
                                         </td>
                                         <?php endif; ?>
-                                        <td class="location-cell"><div><?= $child['description'] !== '' ? htmlspecialchars($child['description']) : 'No description' ?></div></td>
+                                        <td class="location-cell">
+                                            <div>
+                                                <?php 
+                                                    $desc = $child['description'] !== '' ? htmlspecialchars($child['description']) : 'No description';
+                                                    if (mb_strlen(trim($desc)) > 20) {
+                                                        $truncated = mb_substr(trim($desc), 0, 20);
+                                                        echo '<span class="note-short">' . $truncated . '...</span>';
+                                                        echo '<span class="note-full" style="display:none;">' . $desc . '</span>';
+                                                        echo ' <button type="button" class="btn-see-more" style="color:#2563eb; background:none; border:none; padding:0; font-size:11px; font-weight:700; cursor:pointer; margin-left:4px;">See more</button>';
+                                                    } else {
+                                                        echo $desc;
+                                                    }
+                                                ?>
+                                            </div>
+                                        </td>
                                         <td class="metric-cell">
                                             <button type="button" class="btn-view btn-view-history" data-child-id="<?= (int)$child['child_id'] ?>" data-child-name="<?= htmlspecialchars($child['name']) ?>">
                                                 <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -702,7 +807,7 @@ rsort($monthOptions);
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="<?= $isGiveOut ? '12' : '10' ?>">
+                                    <td colspan="<?= $isGiveOut ? '14' : '12' ?>">
                                         <div class="empty-state">No children found for this intervention.</div>
                                     </td>
                                 </tr>
@@ -719,7 +824,6 @@ rsort($monthOptions);
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
         <div class="modal-head">
             <div class="modal-title" id="editModalTitle">Edit Intervention</div>
-            <button type="button" class="btn-secondary" id="btnCloseEditModalTop">Close</button>
         </div>
         <form method="post" action="view_interventions.php?k=<?= urlencode($encodedKey) ?>">
             <div class="modal-body">
@@ -842,12 +946,6 @@ window.interventionConfig = {
     isGiveOut: <?= $isGiveOut ? 'true' : 'false' ?>
 };
 </script>
-<script src="javascript/view_interventions.js"></script>
-</body>
-</html>toryTypeId: <?= (int)$typeId ?>,
-    isGiveOut: <?= $isGiveOut ? 'true' : 'false' ?>
-};
-</script>
-<script src="javascript/view_interventions.js"></script>
+<script src="javascript/view_interventions.js?v=<?= filemtime(__DIR__ . '/javascript/view_interventions.js') ?>"></script>
 </body>
 </html>

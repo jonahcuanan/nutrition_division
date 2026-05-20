@@ -2,7 +2,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const editModal = document.getElementById('editModal');
     const openEditBtn = document.getElementById('btnOpenEditModal');
     const closeEditModalBtn = document.getElementById('btnCloseEditModal');
-    const closeEditModalTopBtn = document.getElementById('btnCloseEditModalTop');
     const confirmModal = document.getElementById('confirmChildModal');
     const confirmName = document.getElementById('confirmChildName');
     const closeConfirmBtn = document.getElementById('btnCloseConfirm');
@@ -13,10 +12,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const historyChildName = document.getElementById('historyChildName');
     const closeHistoryBtn = document.getElementById('btnCloseHistory');
     const closeHistoryTopBtn = document.getElementById('btnCloseHistoryTop');
+    const filterYear = document.getElementById('filterYear');
     const filterMonth = document.getElementById('filterMonth');
+    const filterBarangay = document.getElementById('filterBarangay');
     const filterSex = document.getElementById('filterSex');
     const filterAgeMin = document.getElementById('filterAgeMin');
     const filterAgeMax = document.getElementById('filterAgeMax');
+    const filterSearch = document.getElementById('filterSearch');
+    const btnResetFilters = document.getElementById('btnResetFilters');
 
     const config = window.interventionConfig || { historyTypeId: 0, isGiveOut: false };
     const historyTypeId = config.historyTypeId;
@@ -75,9 +78,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (closeEditModalBtn) {
         closeEditModalBtn.addEventListener('click', closeEditModal);
-    }
-    if (closeEditModalTopBtn) {
-        closeEditModalTopBtn.addEventListener('click', closeEditModal);
     }
     if (editModal) {
         editModal.addEventListener('click', (event) => {
@@ -188,35 +188,63 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     function applyFilters() {
-        const monthValue = filterMonth ? filterMonth.value : '';
-        const sexValue = filterSex ? filterSex.value : '';
-        const ageMinValue = filterAgeMin && filterAgeMin.value !== '' ? parseInt(filterAgeMin.value, 10) : null;
-        const ageMaxValue = filterAgeMax && filterAgeMax.value !== '' ? parseInt(filterAgeMax.value, 10) : null;
+        const yearValue    = filterYear    ? filterYear.value.trim()    : '';
+        const monthValue   = filterMonth   ? filterMonth.value.trim()   : '';
+        const barangayValue= filterBarangay? filterBarangay.value.trim(): '';
+        const sexValue     = filterSex     ? filterSex.value.trim()     : '';
+        const searchValue  = filterSearch  ? filterSearch.value.trim().toLowerCase() : '';
+        const ageMinValue  = filterAgeMin && filterAgeMin.value !== '' ? parseInt(filterAgeMin.value, 10) : null;
+        const ageMaxValue  = filterAgeMax && filterAgeMax.value !== '' ? parseInt(filterAgeMax.value, 10) : null;
 
         document.querySelectorAll('tbody tr.child-profile-row').forEach(row => {
-            const dataCell = row.querySelector('td[data-month]');
-            const rowMonth = dataCell ? dataCell.dataset.month || '' : '';
-            const rowSex = dataCell ? dataCell.dataset.sex || '' : '';
-            const rowAge = dataCell && dataCell.dataset.age !== '' ? parseInt(dataCell.dataset.age, 10) : null;
+            const dataCell   = row.querySelector('td[data-month]');
+            const rowYear    = dataCell ? dataCell.dataset.year     || '' : '';
+            const rowMonth   = dataCell ? dataCell.dataset.month    || '' : '';
+            const rowSex     = dataCell ? dataCell.dataset.sex      || '' : '';
+            const rowBarangay= dataCell ? dataCell.dataset.barangay || '' : '';
+            const rowName    = dataCell ? dataCell.dataset.name     || '' : '';
+            const rowAddress = dataCell ? dataCell.dataset.address  || '' : '';
+            const rowAge     = dataCell && dataCell.dataset.age !== '' ? parseInt(dataCell.dataset.age, 10) : null;
 
             let visible = true;
-            if (monthValue && rowMonth !== monthValue) visible = false;
-            if (visible && sexValue && rowSex !== sexValue) visible = false;
+            if (yearValue     && rowYear     !== yearValue)     visible = false;
+            if (visible && monthValue    && rowMonth    !== monthValue)    visible = false;
+            if (visible && barangayValue && rowBarangay !== barangayValue) visible = false;
+            if (visible && sexValue      && rowSex      !== sexValue)      visible = false;
             if (visible && ageMinValue !== null) {
                 if (rowAge === null || rowAge < ageMinValue) visible = false;
             }
             if (visible && ageMaxValue !== null) {
                 if (rowAge === null || rowAge > ageMaxValue) visible = false;
             }
+            if (visible && searchValue) {
+                if (!rowName.includes(searchValue) && !rowAddress.includes(searchValue)) visible = false;
+            }
 
             row.style.display = visible ? '' : 'none';
         });
     }
 
-    if (filterMonth) filterMonth.addEventListener('change', applyFilters);
-    if (filterSex) filterSex.addEventListener('change', applyFilters);
-    if (filterAgeMin) filterAgeMin.addEventListener('input', applyFilters);
-    if (filterAgeMax) filterAgeMax.addEventListener('input', applyFilters);
+    if (filterYear)     filterYear.addEventListener('change', applyFilters);
+    if (filterMonth)    filterMonth.addEventListener('change', applyFilters);
+    if (filterBarangay) filterBarangay.addEventListener('change', applyFilters);
+    if (filterSex)      filterSex.addEventListener('change', applyFilters);
+    if (filterAgeMin)   filterAgeMin.addEventListener('input', applyFilters);
+    if (filterAgeMax)   filterAgeMax.addEventListener('input', applyFilters);
+    if (filterSearch)   filterSearch.addEventListener('input', applyFilters);
+
+    if (btnResetFilters) {
+        btnResetFilters.addEventListener('click', () => {
+            if (filterYear)      filterYear.value = '';
+            if (filterMonth)     filterMonth.value = '';
+            if (filterBarangay)  filterBarangay.value = '';
+            if (filterSex)       filterSex.value = '';
+            if (filterAgeMin)    filterAgeMin.value = '';
+            if (filterAgeMax)    filterAgeMax.value = '';
+            if (filterSearch)    filterSearch.value = '';
+            applyFilters();
+        });
+    }
 
     document.querySelectorAll('.child-profile-row').forEach((row) => {
         row.addEventListener('click', (event) => {
@@ -228,5 +256,26 @@ document.addEventListener('DOMContentLoaded', function () {
             const childName = nameCell ? nameCell.textContent.trim() : '';
             openConfirmChildModal(childId, childName);
         });
+    });
+
+    document.addEventListener('click', function(event) {
+        const btn = event.target;
+        if (btn && btn.classList.contains('btn-see-more')) {
+            event.stopPropagation();
+            const parent = btn.parentNode;
+            const shortSpan = parent.querySelector('.note-short');
+            const fullSpan = parent.querySelector('.note-full');
+            if (shortSpan && fullSpan) {
+                if (fullSpan.style.display === 'none') {
+                    fullSpan.style.display = 'inline';
+                    shortSpan.style.display = 'none';
+                    btn.textContent = 'See less';
+                } else {
+                    fullSpan.style.display = 'none';
+                    shortSpan.style.display = 'inline';
+                    btn.textContent = 'See more';
+                }
+            }
+        }
     });
 });
