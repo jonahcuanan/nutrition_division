@@ -563,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const btnChangeBns = document.getElementById('btn_change_bns');
-    if (btnChangeBns) {
+    if (btnChangeBns && !btnChangeBns.disabled) {
         btnChangeBns.addEventListener('click', () => {
             const editBarangaySelect = document.getElementById('edit_barangay_id');
             if (!editBarangaySelect || !editBarangaySelect.value) {

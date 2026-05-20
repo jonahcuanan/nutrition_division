@@ -574,6 +574,9 @@ $printCity = $barangayInfo['city'] ?? '__________';
 $printProvince = $barangayInfo['province'] ?? '__________';
 $hidePrintBarangayColumnDefault = ($getBarangayId > 0) || ($getBarangayName !== '') || ($isHw && $assignedBarangayId > 0);
 $printBodyClass = $hidePrintBarangayColumnDefault ? ' print-hide-barangay' : '';
+if ($isPrintReport) {
+    $printBodyClass .= ' print-report-mode';
+}
 
 $barangaysQuery = $conn->query('SELECT barangay_id, barangay_name FROM barangays ORDER BY barangay_name ASC');
 $barangaysList = [];
@@ -593,117 +596,12 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
     <link rel="stylesheet" href="css/tailwind.css">
     <link rel="stylesheet" href="css/child_profiles.css">
     <link rel="stylesheet" href="css/growth-status.css">
-    <style>
-        #tableBody tr.row-focus {
-            background: #dbeafe !important;
-            box-shadow: inset 4px 0 0 #2563eb;
-            transition: background .2s ease, box-shadow .2s ease;
-        }
-        body.update-modal-open #sidebar,
-        body.update-modal-open .sb-mobile-bar {
-            filter: blur(2px);
-            pointer-events: none;
-        }
-        .print-hide-barangay .print-barangay-col {
-            display: none !important;
-        }
 
-        #updateModalMessage {
-            display: none;
-        }
-
-        /* Smaller modal when in Edit Profile mode */
-        #updateModalBox.modal--profile {
-            max-width: 36rem;
-        }
-        #updateModalBox.modal--profile .max-h-\[78vh\] {
-            max-height: 72vh;
-        }
-
-        #toastContainer {
-            position: fixed;
-            top: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 20000;
-            pointer-events: none;
-        }
-
-        .toast {
-            width: fit-content;
-            max-width: min(560px, 92vw);
-            padding: 0;
-            border-radius: 0;
-            font-size: 0.9rem;
-            font-weight: 700;
-            border: none;
-            box-shadow: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            gap: 8px;
-            color: #fff;
-            animation: toastIn .25s ease;
-            pointer-events: auto;
-            align-self: center;
-        }
-
-        .toast-label {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: fit-content;
-            max-width: min(560px, 92vw);
-            padding: 12px 18px;
-            border-radius: 6px;
-            color: #fff;
-            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-            word-break: break-word;
-        }
-
-        .toast-success .toast-label {
-            background: #16a34a;
-        }
-
-        .toast-error .toast-label {
-            background: #ef4444;
-        }
-
-        @keyframes toastIn {
-            from {
-                opacity: 0;
-                transform: translateY(-6px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        <?php if ($isPrintReport): ?>
-        /* Hide everything for print report mode */
-        #sidebar, .sb-mobile-bar, .no-print, .screen-only, .main-content > *:not(.print-only) {
-            display: none !important;
-        }
-        .main-content {
-            margin-left: 0 !important;
-            padding: 0 !important;
-            width: 100% !important;
-        }
-        .print-only {
-            display: block !important;
-        }
-        <?php endif; ?>
-    </style>
 </head>
 <body class="bg-slate-100 text-slate-900 font-sans text-[14px]<?= $printBodyClass ?>" data-server-today="<?= date('Y-m-d'); ?>" data-hide-print-barangay="<?= $hidePrintBarangayColumnDefault ? '1' : '0' ?>" data-print-barangay-default="<?= htmlspecialchars($printBarangayName) ?>">
 <?php include 'sidebar.php'; ?>
 
-<main class="main-content min-h-screen px-4 md:px-9 py-6 md:py-8 pb-16 space-y-5">
+<main class="main-content min-h-screen px-4 md:px-9 py-6 md:py-8 pb-16 space-y-5 print-wrap">
 
     <div id="toastContainer"></div>
 
@@ -1352,8 +1250,13 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                              <div class="flex flex-col gap-1 text-[0.78rem] sm:col-span-2">
                                  <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Assigned Barangay Nutrition Scholar (BNS)</label>
                                  <div class="flex items-center gap-2">
-                                     <input type="text" id="edit_designated_user_name" readonly class="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-[0.82rem] text-slate-700 shadow-sm outline-none cursor-default font-medium animate-pulse" placeholder="No BNS Assigned" />
-                                     <button type="button" id="btn_change_bns" class="shrink-0 rounded-md bg-blue-50 px-3 py-1.5 text-[0.82rem] font-bold text-blue-600 border border-blue-200/50 hover:bg-blue-100/70 transition-all focus:outline-none">Change</button>
+                                     <input type="text" id="edit_designated_user_name" readonly
+                                            class="<?= $isBns ? 'w-full rounded-md border border-slate-800 bg-black px-3 py-1.5 text-[0.82rem] text-white shadow-sm outline-none cursor-default font-medium' : 'w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-1.5 text-[0.82rem] text-slate-700 shadow-sm outline-none cursor-default font-medium animate-pulse' ?>"
+                                            placeholder="No BNS Assigned" />
+                                     <button type="button" id="btn_change_bns" <?= $isBns ? 'disabled aria-disabled="true"' : '' ?>
+                                             class="<?= $isBns ? 'shrink-0 rounded-md bg-black px-3 py-1.5 text-[0.82rem] font-bold text-white border border-slate-800 cursor-not-allowed' : 'shrink-0 rounded-md bg-blue-50 px-3 py-1.5 text-[0.82rem] font-bold text-blue-600 border border-blue-200/50 hover:bg-blue-100/70 transition-all focus:outline-none' ?>">
+                                         Change
+                                     </button>
                                  </div>
                                  <input type="hidden" name="designated_user_id" id="edit_designated_user_id" value="" />
                              </div>

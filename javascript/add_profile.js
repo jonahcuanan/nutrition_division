@@ -659,6 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const userSelectList = document.getElementById('userSelectList');
     const userSelectBarangayName = document.getElementById('userSelectBarangayName');
     const designatedUserIdInput = document.getElementById('designatedUserId');
+    const currentUserRole = document.getElementById('currentUserRole') ? document.getElementById('currentUserRole').value : '';
 
     let selectedUserId = null;
     let selectedUserName = '';
@@ -1048,8 +1049,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
     if (backdrop) backdrop.addEventListener('click', closeModal);
 
-    // confirmBtn now opens the user-selection modal instead of submitting
-    if (confirmBtn) confirmBtn.addEventListener('click', openUserSelectModal);
+    // confirmBtn: BNS users submit directly; others open the user-selection modal
+    if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+            if (currentUserRole === 'Barangay Nutrition Scholars') {
+                // BNS should add child directly without choosing another assigned user
+                submitForm();
+            } else {
+                openUserSelectModal();
+            }
+        });
+    }
 
     // Back button: close user-select modal (review modal stays visible behind it)
     if (userSelectBackBtn) userSelectBackBtn.addEventListener('click', closeUserSelectModal);

@@ -268,87 +268,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     }
 }
 
-// Handle user updates by Admin (from Users Account tab)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user_admin'])) {
-    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest'
-               || (isset($_POST['_ajax']) && $_POST['_ajax'] === '1');
-
-    if (!$isAdmin) {
-        $errorMessage = 'You do not have permission to edit users.';
-    } else {
-        $targetUserId  = (int)($_POST['target_user_id'] ?? 0);
-        $firstName     = trim($_POST['first_name'] ?? '');
-        $middleName    = trim($_POST['middle_name'] ?? '');
-        $lastName      = trim($_POST['last_name'] ?? '');
-        $suffix        = trim($_POST['suffix'] ?? '');
-        $contactNumber = trim($_POST['contact_number'] ?? '');
-        $email         = trim($_POST['email'] ?? '');
-
-        $errors = [];
-        if ($targetUserId <= 0) $errors[] = 'Invalid user ID.';
-        if ($firstName === '' || $lastName === '' || $contactNumber === '' || $email === '') {
-            $errors[] = 'First name, last name, contact number, and email are required.';
-        }
-        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = 'Invalid email address.';
-        } elseif ($email !== '' && substr(strtolower($email), -10) !== '@gmail.com') {
-            $errors[] = 'Email address must end with @gmail.com.';
-        }
-
-        if (empty($errors)) {
-            // Check for duplicate email (excluding the user being edited)
-            $emailCheck = $conn->prepare('SELECT 1 FROM users WHERE email = ? AND user_id != ? LIMIT 1');
-            if ($emailCheck) {
-                $emailCheck->bind_param('si', $email, $targetUserId);
-                $emailCheck->execute();
-                $emailCheck->store_result();
-                if ($emailCheck->num_rows > 0) $errors[] = 'This email address is already in use by another account.';
-                $emailCheck->close();
-            }
-        }
-
-        if (empty($errors)) {
-            // Check for duplicate name (first + last) excluding the user being edited
-            $nameCheck = $conn->prepare('SELECT 1 FROM users WHERE first_name = ? AND last_name = ? AND user_id != ? LIMIT 1');
-            if ($nameCheck) {
-                $nameCheck->bind_param('ssi', $firstName, $lastName, $targetUserId);
-                $nameCheck->execute();
-                $nameCheck->store_result();
-                if ($nameCheck->num_rows > 0) $errors[] = 'A user with this first and last name already exists in the system.';
-                $nameCheck->close();
-            }
-        }
-
-        if (empty($errors)) {
-            $stmt = $conn->prepare('UPDATE users SET first_name = ?, middle_name = ?, last_name = ?, suffix = ?, contact_number = ?, email = ? WHERE user_id = ?');
-            if ($stmt) {
-                $stmt->bind_param('ssssssi', $firstName, $middleName, $lastName, $suffix, $contactNumber, $email, $targetUserId);
-                if ($stmt->execute()) {
-                    $successMessage = 'User account updated successfully.';
-                    log_user_activity($conn, $sessionUserId, 'update_user_details', "Updated details for User ID: $targetUserId");
-                } else {
-                    $errorMessage = 'Failed to update user account.';
-                }
-                $stmt->close();
-            } else {
-                $errorMessage = 'Database error while updating user.';
-            }
-        } else {
-            $errorMessage = implode('. ', $errors);
-        }
-    }
-
-    // JSON response for AJAX requests
-    if ($isAjax) {
-        header('Content-Type: application/json');
-        if ($successMessage) {
-            echo json_encode(['success' => true, 'message' => $successMessage]);
-        } else {
-            echo json_encode(['success' => false, 'message' => $errorMessage ?? 'An error occurred.']);
-        }
-        exit;
-    }
-}
+// NOTE: Admin user-edit functionality removed to disable edit actions from Users Account.
 
 // Fetch activity logs
 $activityLogResult = null;
@@ -383,73 +303,8 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Settings</title>
-    <link rel="stylesheet" href="/nutrition_tracking/css/account_settings.css?v=<?= filemtime(__DIR__ . '/css/account_settings.css') ?>">
-    <style>
-        #toastContainer {
-            position: fixed;
-            top: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 20000;
-            pointer-events: none;
-        }
+    <link rel="stylesheet" href="css/account_settings.css?v=<?= filemtime(__DIR__ . '/css/account_settings.css') ?>">
 
-        .toast {
-            width: fit-content;
-            max-width: min(560px, 92vw);
-            padding: 0;
-            border-radius: 0;
-            font-size: 0.9rem;
-            font-weight: 700;
-            border: none;
-            box-shadow: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            gap: 8px;
-            color: #fff;
-            animation: toastIn .25s ease;
-            pointer-events: auto;
-            align-self: center;
-        }
-
-        .toast-label {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: fit-content;
-            max-width: min(560px, 92vw);
-            padding: 12px 18px;
-            border-radius: 6px;
-            color: #fff;
-            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-            word-break: break-word;
-        }
-
-        .toast-success .toast-label {
-            background: #16a34a;
-        }
-
-        .toast-error .toast-label {
-            background: #ef4444;
-        }
-
-        @keyframes toastIn {
-            from {
-                opacity: 0;
-                transform: translateY(-6px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-    </style>
 </head>
 <body>
 <?php include 'sidebar.php'; ?>
@@ -646,7 +501,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                             <th>Assigned Barangay</th>
                             <th>Contact Number</th>
                             <th>Email Address</th>
-                            <th style="text-align:center;">Actions</th>
+                            <!-- Actions column removed -->
                         </tr>
                     </thead>
                     <tbody>
@@ -682,20 +537,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                 </td>
                                 <td class="ua-contact"><?= $contactNumber !== '' ? htmlspecialchars($contactNumber) : '<span class="ua-dash">&mdash;</span>' ?></td>
                                 <td class="ua-email"><?= $email !== '' ? htmlspecialchars($email) : '<span class="ua-dash">&mdash;</span>' ?></td>
-                                <td style="text-align:center;">
-                                    <button type="button" class="btn-icon btn-edit-user" title="Edit User Details"
-                                            onclick='openEditUserModal(<?= json_encode([
-                                                'user_id' => $row['user_id'],
-                                                'first_name' => $row['first_name'],
-                                                'middle_name' => $row['middle_name'],
-                                                'last_name' => $row['last_name'],
-                                                'suffix' => $row['suffix'],
-                                                'contact_number' => $row['contact_number'],
-                                                'email' => $row['email']
-                                            ]) ?>)'>
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                    </button>
-                                </td>
+                                <!-- Actions cell removed -->
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
@@ -741,7 +583,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
 
                         <div class="field">
                             <label>User ID</label>
-                            <div class="input-readonly-locked no-click" title="User ID cannot be edited" style="pointer-events: none; cursor: default; background: #f1f5f9; border-color: #e2e8f0; color: #64748b;">
+                            <div class="input-readonly-locked no-click" title="User ID cannot be edited">
                                 <?= htmlspecialchars(str_pad((string)($sessionUserId > 0 ? $sessionUserId : ''), 6, '0', STR_PAD_LEFT)) ?>
                             </div>
                             <span class="hint">This ID is system-assigned and cannot be edited.</span>
@@ -1037,83 +879,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
 </div>
 <?php endif; ?>
 
-<!-- ══════════════════════════════
-     EDIT USER MODAL (ADMIN)
-══════════════════════════════ -->
-<?php if ($isAdmin): ?>
-<div class="modal-overlay" id="editUserModal">
-    <div class="modal-backdrop" onclick="closeEditModal()"></div>
-    <div class="modal-box">
-        <div class="modal-header">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <div class="modal-header-icon" style="background:rgba(59, 130, 246, 0.1); color: #3b82f6;">✏️</div>
-                <div>
-                    <div class="modal-title">Edit User Details</div>
-                    <div class="modal-sub">Update user information below</div>
-                </div>
-            </div>
-            <button type="button" class="modal-close" onclick="closeEditModal()">✕</button>
-        </div>
-        <div class="modal-body">
-            <form method="post" action="" id="editUserForm">
-                <input type="hidden" name="update_user_admin" value="1">
-                <input type="hidden" name="target_user_id" id="editTargetUserId">
-
-                <div class="section-label">Account Details</div>
-                <div class="field">
-                    <label>User ID</label>
-                    <input type="text" id="editUserIdDisplay" class="input-readonly-locked" readonly disabled>
-                </div>
-
-                <hr class="divider">
-                <div class="section-label">Personal Information</div>
-                <div class="form-grid-2">
-                    <div class="field">
-                        <label>First Name <span class="req">*</span></label>
-                        <input type="text" name="first_name" id="editFirstName" required>
-                    </div>
-                    <div class="field">
-                        <label>Middle Name</label>
-                        <input type="text" name="middle_name" id="editMiddleName">
-                    </div>
-                </div>
-                <div class="form-grid-2">
-                    <div class="field">
-                        <label>Last Name <span class="req">*</span></label>
-                        <input type="text" name="last_name" id="editLastName" required>
-                    </div>
-                    <div class="field">
-                        <label>Suffix</label>
-                        <input type="text" name="suffix" id="editSuffix">
-                    </div>
-                </div>
-
-                <hr class="divider">
-                <div class="section-label">Contact Information</div>
-                <div class="form-grid-2">
-                    <div class="field">
-                        <label>Contact Number <span class="req">*</span></label>
-                        <input type="text" name="contact_number" id="editContactNumber" required>
-                    </div>
-                    <div class="field">
-                        <label>Email Address <span class="req">*</span></label>
-                        <input type="email" name="email" id="editEmail" required
-                               pattern="[a-zA-Z0-9._%+-]+@gmail\.com"
-                               title="Email address must end with @gmail.com">
-                    </div>
-                </div>
-            </form>
-        </div>
-        <div class="modal-footer">
-            <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
-            <button type="submit" form="editUserForm" class="btn btn-primary">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Save Changes
-            </button>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
+<!-- Edit user modal removed: admin edit actions disabled -->
 
 <script src="javascript/account_settings.js?v=<?= filemtime(__DIR__ . '/javascript/account_settings.js') ?>"></script>
 </body>

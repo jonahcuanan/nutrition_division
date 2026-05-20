@@ -317,6 +317,14 @@ main {
     cursor: pointer;
 }
 
+.input-readonly-locked {
+    pointer-events: none;
+    cursor: default;
+    background: var(--surface-3);
+    border-color: var(--border);
+    color: var(--text-muted);
+}
+
 /* ── Password Strength ── */
 .pw-strength {
     height: 4px;
@@ -1720,4 +1728,69 @@ main {
     cursor: default;
     letter-spacing: 0.04em;
     min-height: 44px;
+}
+
+/* ── Toast Notifications ── */
+#toastContainer {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 20000;
+    pointer-events: none;
+}
+
+.toast {
+    width: fit-content;
+    max-width: min(560px, 92vw);
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+    border: none;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 8px;
+    color: #fff;
+    animation: toastIn .25s ease;
+    pointer-events: auto;
+    align-self: center;
+}
+
+.toast-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    max-width: min(560px, 92vw);
+    padding: 12px 18px;
+    border-radius: 6px;
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    word-break: break-word;
+}
+
+.toast-success .toast-label {
+    background: #16a34a;
+}
+
+.toast-error .toast-label {
+    background: #ef4444;
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

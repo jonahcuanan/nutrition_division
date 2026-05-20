@@ -1,0 +1,10 @@
+{
+  "name": "nutrition-system",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ../css/tailwind-input.css -o ../css/tailwind.css --config ../javascript/tailwind.config.js --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

@@ -499,6 +499,7 @@ if ($gResult) while ($g = $gResult->fetch_assoc()) $guardians[] = $g;
 
         <form method="post" id="childForm" class="space-y-5">
             <input type="hidden" name="designated_user_id" id="designatedUserId" value="">
+            <input type="hidden" id="currentUserRole" value="<?= htmlspecialchars($current_role, ENT_QUOTES) ?>">
             <!-- ── Child Details Card ── -->
             <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
