@@ -506,7 +506,7 @@ if ($gResult) while ($g = $gResult->fetch_assoc()) $guardians[] = $g;
                     <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-base">🧒</div>
                     <div>
                         <h2 class="text-[0.95rem] font-semibold text-slate-900">Child Information</h2>
-                        <p class="text-[0.75rem] text-slate-400">Personal details of the child being registered</p>
+                        <p class="text-[0.75rem] text-slate-400">Personal details and location of the child being registered</p>
                     </div>
                 </div>
                 <div class="px-5 py-5">
@@ -553,8 +553,6 @@ if ($gResult) while ($g = $gResult->fetch_assoc()) $guardians[] = $g;
                         </div>
                     </div>
 
-                    <hr class="my-4 border-slate-100">
-
                     <!-- Birthdate + Age -->
                     <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div class="flex flex-col gap-1.5">
@@ -571,55 +569,11 @@ if ($gResult) while ($g = $gResult->fetch_assoc()) $guardians[] = $g;
                             <span class="text-[0.68rem] text-slate-400">Calculated from birthdate and measurement date</span>
                         </div>
                     </div>
-                    
-                    <!-- Initial Measurement -->
-                    <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Measurement Date <span class="text-rose-500">*</span></label>
-                            <input type="date" name="measurement_date" id="measurementDateField" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
-                            <span class="text-[0.68rem] text-slate-400">Used to compute age at measurement</span>
-                        </div>
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Initial Height (cm) <span class="text-rose-500">*</span></label>
-                            <input type="number" name="height" id="heightField" step="0.1" min="0" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
-                            <span class="text-[0.68rem] text-slate-400">Current measured height in centimeters</span>
-                        </div>
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Initial Weight (kg) <span class="text-rose-500">*</span></label>
-                            <input type="number" name="weight" id="weightField" step="0.1" min="0" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
-                            <span class="text-[0.68rem] text-slate-400">Current measured weight in kilograms</span>
-                        </div>
-                        <div id="muacContainer" class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">MUAC Measurement (cm)</label>
-                            <input type="number" name="muac_measurement" id="muacField" step="0.1" min="0" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
-                            <span class="text-[0.68rem] text-slate-400">Mid-Upper Arm Circumference</span>
-                        </div>
-                    </div>
-
-                    <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Height-for-Age Status</label>
-                            <input type="text" name="height_for_age_status" id="hfaStatusField" readonly class="growth-status-field w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 read-only:cursor-default read-only:font-semibold">
-                        </div>
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Weight-for-Age Status</label>
-                            <input type="text" name="weight_for_age_status" id="wfaStatusField" readonly class="growth-status-field w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 read-only:cursor-default read-only:font-semibold">
-                        </div>
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Weight-for-Length/Height Status</label>
-                            <input type="text" name="weight_for_ltht_status" id="wflStatusField" readonly class="growth-status-field w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 read-only:cursor-default read-only:font-semibold">
-                        </div>
-                        <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">MUAC Status</label>
-                            <input type="text" name="muac_status" id="muacStatusField" readonly class="growth-status-field w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 read-only:cursor-default read-only:font-semibold">
-                        </div>
-                    </div>
-                    <div id="statusMessage" class="mt-1 text-[0.72rem] text-rose-600" aria-live="polite"></div>
 
                     <hr class="my-4 border-slate-100">
 
                     <!-- Address / Barangay / IP -->
-                    <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div class="flex flex-col gap-1.5">
                             <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Address/Location <span class="text-rose-500">*</span></label>
                             <input type="text" name="address" id="addressField" placeholder="e.g. Purok 3" value="PUROK " required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] uppercase text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400" aria-describedby="addressWarning">
@@ -646,6 +600,64 @@ if ($gResult) while ($g = $gResult->fetch_assoc()) $guardians[] = $g;
                             <span class="text-[0.68rem] text-slate-400">Enabled after entering address</span>
                         </div>
                     </div>
+
+                </div>
+            </div>
+
+            <!-- ── Measurement Details Card ── -->
+            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-base">📏</div>
+                    <div>
+                        <h2 class="text-[0.95rem] font-semibold text-slate-900">Measurement Information</h2>
+                        <p class="text-[0.75rem] text-slate-400">Initial growth measurements and computed statuses</p>
+                    </div>
+                </div>
+                <div class="px-5 py-5">
+
+                    <!-- Initial Measurement -->
+                    <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Measurement Date <span class="text-rose-500">*</span></label>
+                            <input type="date" name="measurement_date" id="measurementDateField" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
+                            <span class="text-[0.68rem] text-slate-400">Used to compute age at measurement</span>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Initial Height (cm) <span class="text-rose-500">*</span></label>
+                            <input type="number" name="height" id="heightField" step="0.1" min="0" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
+                            <span class="text-[0.68rem] text-slate-400">Current measured height in centimeters</span>
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Initial Weight (kg) <span class="text-rose-500">*</span></label>
+                            <input type="number" name="weight" id="weightField" step="0.1" min="0" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
+                            <span class="text-[0.68rem] text-slate-400">Current measured weight in kilograms</span>
+                        </div>
+                        <div id="muacContainer" class="flex flex-col gap-1.5">
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">MUAC Measurement (cm)</label>
+                            <input type="number" name="muac_measurement" id="muacField" step="0.1" min="0" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
+                            <span class="text-[0.68rem] text-slate-400">Mid-Upper Arm Circumference</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Height-for-Age Status</label>
+                            <input type="text" name="height_for_age_status" id="hfaStatusField" readonly class="growth-status-field w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 read-only:cursor-default read-only:font-semibold">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Weight-for-Age Status</label>
+                            <input type="text" name="weight_for_age_status" id="wfaStatusField" readonly class="growth-status-field w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 read-only:cursor-default read-only:font-semibold">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Weight-for-Length/Height Status</label>
+                            <input type="text" name="weight_for_ltht_status" id="wflStatusField" readonly class="growth-status-field w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 read-only:cursor-default read-only:font-semibold">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">MUAC Status</label>
+                            <input type="text" name="muac_status" id="muacStatusField" readonly class="growth-status-field w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 read-only:cursor-default read-only:font-semibold">
+                        </div>
+                    </div>
+                    <div id="statusMessage" class="mt-1 text-[0.72rem] text-rose-600" aria-live="polite"></div>
 
                 </div>
             </div>

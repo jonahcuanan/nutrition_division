@@ -1101,9 +1101,6 @@ main {
         padding: 24px 28px;
     }
 
-    .page-header h1 {
-        font-size: 1.5rem;
-    }
 
     .settings-nav {
         width: 100%;
@@ -1316,7 +1313,8 @@ main {
 .user-account-table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 640px;
+    min-width: 0; /* allow table to shrink to container width */
+    table-layout: fixed; /* distribute columns and enable wrapping */
     font-family: 'Sora', sans-serif;
 }
 
@@ -1335,7 +1333,7 @@ main {
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: #ffffff;
-    white-space: nowrap;
+    white-space: normal;
     text-align: left;
     border-right: 1px solid rgba(255, 255, 255, 0.07);
 }
@@ -1353,11 +1351,30 @@ main {
     border-right: 1px solid var(--border);
     vertical-align: middle;
     text-transform: uppercase;
-    white-space: nowrap;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .user-account-table td:last-child {
     border-right: none;
+}
+
+/* Narrow User ID and Contact Number columns to reduce width */
+.user-account-table th:nth-child(1),
+.user-account-table td:nth-child(1) {
+    width: 100px;
+    max-width: 100px;
+}
+.user-account-table th:nth-child(3),
+.user-account-table td:nth-child(3) {
+    width: 80px;
+    max-width: 80px;
+}
+.user-account-table th:nth-child(5),
+.user-account-table td:nth-child(5) {
+    width: 160px;
+    max-width: 160px;
 }
 
 .user-account-table tbody tr {
@@ -1456,6 +1473,15 @@ main {
 .ua-email {
     font-size: 0.82rem;
     color: var(--text-muted);
+}
+
+/* Ensure email addresses are left-aligned and not transformed to uppercase */
+.user-account-table tbody td.ua-email {
+    text-align: left !important; /* align cell content only (not header) */
+    text-transform: none;
+    direction: ltr;
+    unicode-bidi: embed;
+    overflow-wrap: anywhere;
 }
 
 .ua-dash {

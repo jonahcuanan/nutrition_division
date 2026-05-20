@@ -523,11 +523,18 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                 $email = trim($row['email'] ?? '');
 
                                 $roleRaw = $row['role'] ?? '';
+                                // Display acronyms for long role names
+                                $roleDisplay = $roleRaw;
+                                if ($roleRaw === 'Barangay Nutrition Scholars') {
+                                    $roleDisplay = 'BNS';
+                                } elseif ($roleRaw === 'Health Worker') {
+                                    $roleDisplay = 'HW';
+                                }
                             ?>
                             <tr>
                                 <td><span class="ua-username"><?= htmlspecialchars(str_pad((string)$row['user_id'], 6, '0', STR_PAD_LEFT)) ?></span></td>
                                 <td><?= htmlspecialchars($fullName) ?></td>
-                                <td><?= htmlspecialchars($roleRaw) ?></td>
+                                <td title="<?= htmlspecialchars($roleRaw) ?>"><?= htmlspecialchars($roleDisplay) ?></td>
                                 <td>
                                     <?php if ($barangayUnassigned): ?>
                                         <span class="ua-barangay-unassigned">Unassigned</span>
