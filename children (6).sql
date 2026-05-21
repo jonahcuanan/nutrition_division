@@ -104,6 +104,7 @@ CREATE TABLE `growth_records` (
   `height_id` int(11) DEFAULT NULL,
   `wfl_id` int(11) DEFAULT NULL,
   `recorded_by` int(11) DEFAULT NULL,
+  `is_muac_only` tinyint(1) NOT NULL DEFAULT 0,
   `muac_id` int(11) DEFAULT NULL,
   `muac_measurement` decimal(5,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

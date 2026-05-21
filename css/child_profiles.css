@@ -399,6 +399,16 @@
         font-weight: 400;
     }
 
+/* Header badge alignment for screen */
+@media screen {
+    .no-print.justify-between #rowCount,
+    .no-print .justify-between #rowCount {
+        margin-left: 12px;
+        display: inline-flex;
+        align-items: center;
+    }
+}
+
     .print-upper {
         text-transform: uppercase;
     }
@@ -761,6 +771,19 @@ body.update-modal-open .sb-mobile-bar {
 }
 #updateModalBox.modal--profile .max-h-\[78vh\] {
     max-height: 72vh;
+}
+
+.action-menu-btn,
+.btn-open-update,
+.btn-open-archive,
+#btnToggleFilters,
+#btnGenerateReport,
+#btnResetFilters,
+#btnUpdateSave,
+#btnUpdateCancel,
+#btn_change_bns {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #toastContainer {

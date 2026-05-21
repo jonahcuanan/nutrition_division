@@ -591,7 +591,7 @@ sort($barangayOptions);
                     <div>
                         <div class="view-detail-label" style="margin-bottom:4px;">Year</div>
                         <select id="filterYear" class="field-input" style="min-width:100px;">
-                            <option value="">All years</option>
+                            <option value="">All Years</option>
                             <?php foreach ($yearOptions as $yr): ?>
                                 <option value="<?= htmlspecialchars($yr) ?>"><?= htmlspecialchars($yr) ?></option>
                             <?php endforeach; ?>
@@ -602,7 +602,7 @@ sort($barangayOptions);
                     <div>
                         <div class="view-detail-label" style="margin-bottom:4px;">Month</div>
                         <select id="filterMonth" class="field-input" style="min-width:130px;">
-                            <option value="">All months</option>
+                            <option value="">All Months</option>
                             <option value="01">January</option>
                             <option value="02">February</option>
                             <option value="03">March</option>
@@ -622,7 +622,7 @@ sort($barangayOptions);
                     <div>
                         <div class="view-detail-label" style="margin-bottom:4px;">Barangay</div>
                         <select id="filterBarangay" class="field-input" style="min-width:160px;">
-                            <option value="">All barangays</option>
+                            <option value="">All Barangays</option>
                             <?php foreach ($barangayOptions as $br): ?>
                                 <option value="<?= htmlspecialchars($br) ?>"><?= htmlspecialchars($br) ?></option>
                             <?php endforeach; ?>
@@ -633,22 +633,22 @@ sort($barangayOptions);
                     <div>
                         <div class="view-detail-label" style="margin-bottom:4px;">Sex</div>
                         <select id="filterSex" class="field-input" style="min-width:110px;">
-                            <option value="">All</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
+                            <option value="">All Sex (Boys & Girls)</option>
+                            <option value="Male">Male (Boys)</option>
+                            <option value="Female">Female (Girls)</option>
                         </select>
                     </div>
 
                     <!-- Age Min -->
                     <div>
-                        <div class="view-detail-label" style="margin-bottom:4px;">Age Min (mos.)</div>
-                        <input id="filterAgeMin" class="field-input" type="number" min="0" placeholder="Any" style="width:110px;">
+                        <div class="view-detail-label" style="margin-bottom:4px;">Min Age (months)</div>
+                        <input id="filterAgeMin" class="field-input" type="number" min="0" placeholder="Any age" style="width:110px;">
                     </div>
 
                     <!-- Age Max -->
                     <div>
-                        <div class="view-detail-label" style="margin-bottom:4px;">Age Max (mos.)</div>
-                        <input id="filterAgeMax" class="field-input" type="number" min="0" placeholder="Any" style="width:110px;">
+                        <div class="view-detail-label" style="margin-bottom:4px;">Max Age (months)</div>
+                        <input id="filterAgeMax" class="field-input" type="number" min="0" placeholder="Any age" style="width:110px;">
                     </div>
 
                     <!-- Reset button -->

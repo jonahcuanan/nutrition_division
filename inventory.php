@@ -907,19 +907,19 @@ if ($stmtCat) {
                     <input type="text" id="distSearch" class="dist-search-input" placeholder="Search item, child, notes...">
                 </div>
                 <select id="distBarangayFilter" class="filter-select">
-                    <option value="">All barangays</option>
+                    <option value="">All Barangays</option>
                     <?php foreach ($barangays as $b): ?>
                         <option value="<?= htmlspecialchars($b) ?>"><?= htmlspecialchars($b) ?></option>
                     <?php endforeach; ?>
                 </select>
                 <select id="distYearFilter" class="filter-select">
-                    <option value="">All years</option>
+                    <option value="">All Years</option>
                     <?php foreach ($years as $y): ?>
                         <option value="<?= htmlspecialchars($y) ?>"><?= htmlspecialchars($y) ?></option>
                     <?php endforeach; ?>
                 </select>
                 <select id="distMonthFilter" class="filter-select">
-                    <option value="">All months</option>
+                    <option value="">All Months</option>
                     <option value="01">January</option>
                     <option value="02">February</option>
                     <option value="03">March</option>
@@ -934,7 +934,7 @@ if ($stmtCat) {
                     <option value="12">December</option>
                 </select>
                 <select id="distItemFilter" class="filter-select">
-                    <option value="">All items</option>
+                    <option value="">All Items</option>
                     <?php foreach ($itemsForFilter as $it): ?>
                         <option value="<?= htmlspecialchars($it) ?>"><?= htmlspecialchars($it) ?></option>
                     <?php endforeach; ?>

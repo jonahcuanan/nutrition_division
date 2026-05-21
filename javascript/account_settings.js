@@ -567,6 +567,22 @@ function initAccountSettings() {
         document.getElementById('editContactNumber').value = data.contact_number;
         document.getElementById('editEmail').value = data.email;
 
+        const barangaySelect = document.getElementById('editBarangaySelect');
+        const barangayField = document.getElementById('editBarangayField');
+        if (barangaySelect) {
+            barangaySelect.value = data.barangay_id || '';
+            if (data.role === 'Staff') {
+                barangaySelect.disabled = true;
+                if (barangayField) barangayField.classList.add('field-locked');
+            } else {
+                barangaySelect.disabled = false;
+                if (barangayField) barangayField.classList.remove('field-locked');
+            }
+        }
+        
+        const pwField = document.getElementById('editPassword');
+        if (pwField) pwField.value = '';
+
         editModal.classList.add('active');
         document.body.style.overflow = 'hidden';
     };
@@ -593,16 +609,31 @@ initAccountSettings();
 
 // ── Users Account table search ────────────────────
 window.filterUsersTable = function () {
-    const input     = document.getElementById('usersSearchInput');
-    const table     = document.getElementById('usersAccountTable');
-    const noResults = document.getElementById('usersNoResults');
-    if (!input || !table) return;
+    const searchInput    = document.getElementById('usersSearchInput');
+    const roleSelect     = document.getElementById('roleFilter');
+    const barangaySelect = document.getElementById('barangayFilter');
+    const table          = document.getElementById('usersAccountTable');
+    const noResults      = document.getElementById('usersNoResults');
+    if (!table) return;
 
-    const filter     = input.value.trim().toLowerCase();
-    let   anyVisible = false;
+    const term          = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const roleFilter    = roleSelect     ? roleSelect.value     : '';
+    const barangayFilter = barangaySelect ? barangaySelect.value : '';
+    let   anyVisible    = false;
+
+    // Toggle active highlight on filters
+    if (roleSelect)     roleSelect.classList.toggle('filter-active', roleFilter !== '');
+    if (barangaySelect) barangaySelect.classList.toggle('filter-active', barangayFilter !== '');
 
     Array.from(table.tBodies[0]?.rows || []).forEach(row => {
-        const match = row.textContent.toLowerCase().includes(filter);
+        const textMatch     = row.textContent.toLowerCase().includes(term);
+        const rowRole       = row.getAttribute('data-role')     || '';
+        const rowBarangay   = row.getAttribute('data-barangay') || '';
+
+        const roleMatch     = (roleFilter     === '' || rowRole     === roleFilter);
+        const barangayMatch = (barangayFilter === '' || rowBarangay === barangayFilter);
+
+        const match = textMatch && roleMatch && barangayMatch;
         row.style.display = match ? '' : 'none';
         if (match) anyVisible = true;
     });
@@ -610,18 +641,35 @@ window.filterUsersTable = function () {
     if (noResults) noResults.style.display = anyVisible ? 'none' : 'block';
 };
 
-// ── Activity Logs table search ────────────────────
-window.filterLogsTable = function () {
-    const input     = document.getElementById('logsSearchInput');
-    const table     = document.getElementById('logsTable');
-    const noResults = document.getElementById('logsNoResults');
-    if (!input || !table) return;
 
-    const filter     = input.value.trim().toLowerCase();
-    let   anyVisible = false;
+// ── Activity Logs table search + filters ─────────
+window.filterLogsTable = function () {
+    const input          = document.getElementById('logsSearchInput');
+    const roleSelect     = document.getElementById('logRoleFilter');
+    const monthSelect    = document.getElementById('logMonthFilter');
+    const table          = document.getElementById('logsTable');
+    const noResults      = document.getElementById('logsNoResults');
+    if (!table) return;
+
+    const term         = input ? input.value.trim().toLowerCase() : '';
+    const roleFilter   = roleSelect     ? roleSelect.value     : '';
+    const monthFilter  = monthSelect    ? monthSelect.value    : '';
+
+    // Toggle active highlight on dropdowns
+    if (roleSelect)     roleSelect.classList.toggle('filter-active',  roleFilter  !== '');
+    if (monthSelect)    monthSelect.classList.toggle('filter-active',  monthFilter !== '');
+
+    let anyVisible = false;
 
     Array.from(table.tBodies[0]?.rows || []).forEach(row => {
-        const match = row.textContent.toLowerCase().includes(filter);
+        const rowRole     = row.getAttribute('data-role')     || '';
+        const rowMonth    = row.getAttribute('data-month')    || '';
+
+        const textMatch     = term === '' || row.textContent.toLowerCase().includes(term);
+        const roleMatch     = roleFilter  === '' || rowRole     === roleFilter;
+        const monthMatch    = monthFilter === '' || rowMonth    === monthFilter;
+
+        const match = textMatch && roleMatch && monthMatch;
         row.style.display = match ? '' : 'none';
         if (match) anyVisible = true;
     });

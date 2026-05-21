@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hfaFilter = document.getElementById('hfaFilter');
     const wfaFilter = document.getElementById('wfaFilter');
     const wflhFilter = document.getElementById('wflhFilter');
+    const muacFilter = document.getElementById('muacFilter');
 
     const tableBody = document.getElementById('tableBody');
     const printTableBody = document.getElementById('printTableBody');
@@ -63,6 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentBirthdate = '';
     let currentSex = '';
     let statusDebounceTimer = null;
+    let openActionMenu = null;
+    let childProfileFetchController = null;
 
     function showToast(type, message) {
         const host = document.getElementById('toastContainer');
@@ -97,6 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeUpdateModal() {
+        if (childProfileFetchController) {
+            childProfileFetchController.abort();
+            childProfileFetchController = null;
+        }
+        closeOpenActionMenu();
+        setUpdateModalLoading(false);
         updateModal.classList.add('opacity-0');
         updateModalBox.classList.add('translate-y-4', 'scale-95');
         updateModalBox.classList.remove('translate-y-0', 'scale-100');
@@ -123,11 +132,48 @@ document.addEventListener('DOMContentLoaded', () => {
         if (statusPreviewHint) statusPreviewHint.textContent = '(enter height & weight)';
     }
 
+    function setUpdateModalLoading(isLoading, message = '') {
+        if (!updateModalMessage) return;
+
+        if (isLoading) {
+            updateModalMessage.style.display = 'block';
+            updateModalMessage.className = 'mt-3 text-xs text-slate-500';
+            updateModalMessage.textContent = message || 'Loading child profile...';
+        } else {
+            updateModalMessage.textContent = '';
+            updateModalMessage.style.display = 'none';
+        }
+    }
+
+    function closeOpenActionMenu() {
+        if (!openActionMenu) return;
+
+        const openMenuButton = openActionMenu.previousElementSibling;
+        openActionMenu.classList.add('hidden');
+        if (openMenuButton && openMenuButton.classList.contains('action-menu-btn')) {
+            openMenuButton.setAttribute('aria-expanded', 'false');
+        }
+        openActionMenu = null;
+    }
+
     // ── Action Handlers ──
     document.querySelectorAll('.btn-open-update').forEach(btn => {
         btn.addEventListener('click', () => {
+            closeOpenActionMenu();
+
             const childId = btn.getAttribute('data-child-id');
             const mode = btn.getAttribute('data-mode') || 'measurement';
+
+            if (childProfileFetchController) {
+                childProfileFetchController.abort();
+            }
+            childProfileFetchController = new AbortController();
+
+            if (updateForm) {
+                updateForm.reset();
+            }
+            resetPreviews();
+            setUpdateModalLoading(true, 'Loading child profile...');
 
             inputChildId.value = childId;
             inputUpdateMode.value = mode;
@@ -182,10 +228,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateModalBox.classList.add('modal--profile');
             }
 
+            openUpdateModal();
+
             // Fetch Child Data
-            fetch(`child_profiles.php?action=get_child_profile&child_id=${childId}`)
+            const requestToken = String(Date.now());
+            if (inputRecordId) {
+                inputRecordId.dataset.requestToken = requestToken;
+            }
+
+            fetch(`child_profiles.php?action=get_child_profile&child_id=${childId}`, {
+                signal: childProfileFetchController.signal
+            })
                 .then(res => res.json())
                 .then(json => {
+                    if (inputRecordId && inputRecordId.dataset.requestToken !== requestToken) {
+                        return;
+                    }
+
                     if (json.success && json.data) {
                         const d = json.data;
                         currentBirthdate = d.birthdate;
@@ -267,14 +326,26 @@ document.addEventListener('DOMContentLoaded', () => {
                             btnUpdateSave.disabled = true;
                             btnUpdateSave.classList.add('opacity-70', 'cursor-not-allowed');
                         }
-                        openUpdateModal();
+                        setUpdateModalLoading(false);
                     } else {
+                        setUpdateModalLoading(false);
                         showToast('error', 'Error fetching child profile: ' + (json.message || 'Unknown error'));
+                        closeUpdateModal();
                     }
                 })
                 .catch(err => {
+                    if (err && err.name === 'AbortError') {
+                        return;
+                    }
+
+                    if (inputRecordId && inputRecordId.dataset.requestToken !== requestToken) {
+                        return;
+                    }
+
+                    setUpdateModalLoading(false);
                     console.error(err);
                     showToast('error', 'Network error while fetching child profile.');
+                    closeUpdateModal();
                 });
         });
     });
@@ -711,6 +782,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hfa = (hfaFilter?.value || '').toLowerCase();
         const wfa = (wfaFilter?.value || '').toLowerCase();
         const wflh = (wflhFilter?.value || '').toLowerCase();
+        const muac = (muacFilter?.value || '').toLowerCase();
 
         // Filter Screen Table
         const screenRows = tableBody ? tableBody.querySelectorAll('tr[data-child-id]') : [];
@@ -718,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         screenRows.forEach(row => {
             if (row.id === 'screenNoDataRow') return;
-            const matches = checkRowMatches(row, query, sex, ip, barangay, ageMin, ageMax, hfa, wfa, wflh);
+            const matches = checkRowMatches(row, query, sex, ip, barangay, ageMin, ageMax, hfa, wfa, wflh, muac);
             if (matches) {
                 row.style.display = '';
                 screenCount++;
@@ -734,7 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         printRows.forEach(row => {
             if (row.id === 'printNoDataRow') return;
-            const matches = checkRowMatches(row, query, sex, ip, barangay, ageMin, ageMax, hfa, wfa, wflh);
+            const matches = checkRowMatches(row, query, sex, ip, barangay, ageMin, ageMax, hfa, wfa, wflh, muac);
             if (matches) {
                 row.style.display = '';
                 const seqCell = row.querySelector('.print-center');
@@ -747,7 +819,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update UI
         const rowCount = document.getElementById('rowCount');
-        if (rowCount) rowCount.textContent = `${screenCount} records`;
+        const rowCountNumber = document.getElementById('rowCountNumber');
+        if (rowCountNumber) {
+            rowCountNumber.textContent = String(screenCount);
+        } else if (rowCount) {
+            rowCount.textContent = `${screenCount} records`;
+        }
 
         const screenNoDataRow = document.getElementById('screenNoDataRow');
         if (screenNoDataRow) {
@@ -768,7 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function checkRowMatches(row, query, sex, ip, barangay, ageMin, ageMax, hfa, wfa, wflh) {
+    function checkRowMatches(row, query, sex, ip, barangay, ageMin, ageMax, hfa, wfa, wflh, muac) {
         const rowName = (row.getAttribute('data-name') || '').toLowerCase();
         const rowSex = (row.getAttribute('data-sex') || '').toLowerCase();
         const rowIp = (row.getAttribute('data-ip') || '').toLowerCase();
@@ -777,6 +854,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const rowHfa = (row.getAttribute('data-hfa') || '').toLowerCase();
         const rowWfa = (row.getAttribute('data-wfa') || '').toLowerCase();
         const rowWflh = (row.getAttribute('data-wflh') || '').toLowerCase();
+        const rowMuac = (row.getAttribute('data-muac') || '').toLowerCase();
         const rowText = row.textContent.toLowerCase();
 
         const matchesQuery = !query || rowName.includes(query) || rowText.includes(query);
@@ -788,12 +866,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const matchesHfa = !hfa || rowHfa === hfa;
         const matchesWfa = !wfa || rowWfa === wfa;
         const matchesWflh = !wflh || rowWflh === wflh;
+        const matchesMuac = !muac || rowMuac === muac;
 
-        return matchesQuery && matchesSex && matchesIp && matchesBarangay && matchesAgeMin && matchesAgeMax && matchesHfa && matchesWfa && matchesWflh;
+        return matchesQuery && matchesSex && matchesIp && matchesBarangay && matchesAgeMin && matchesAgeMax && matchesHfa && matchesWfa && matchesWflh && matchesMuac;
     }
 
     // Filter Event Listeners
-    [searchInput, sexFilter, ipFilter, barangayFilter, ageMinFilter, ageMaxFilter, hfaFilter, wfaFilter, wflhFilter].forEach(el => {
+    [searchInput, sexFilter, ipFilter, barangayFilter, ageMinFilter, ageMaxFilter, hfaFilter, wfaFilter, wflhFilter, muacFilter].forEach(el => {
         if (el) el.addEventListener('input', filterRows);
         if (el && (el.tagName === 'SELECT')) el.addEventListener('change', filterRows);
     });
@@ -817,7 +896,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reset Filters
     if (btnResetFilters) {
         btnResetFilters.addEventListener('click', () => {
-            [searchInput, sexFilter, ipFilter, barangayFilter, ageMinFilter, ageMaxFilter, hfaFilter, wfaFilter, wflhFilter].forEach(el => {
+            [searchInput, sexFilter, ipFilter, barangayFilter, ageMinFilter, ageMaxFilter, hfaFilter, wfaFilter, wflhFilter, muacFilter].forEach(el => {
                 if (el) el.value = '';
             });
             filterRows();
@@ -845,6 +924,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const paramHfa = urlParams.get('hfa');
         const paramWfa = urlParams.get('wfa');
         const paramWflh = urlParams.get('wflh');
+        const paramMuac = urlParams.get('muac') || urlParams.get('muac_status');
 
         let hasActiveFilters = false;
 
@@ -873,6 +953,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (paramHfa && hfaFilter) { hfaFilter.value = paramHfa.toLowerCase(); hasActiveFilters = true; }
         if (paramWfa && wfaFilter) { wfaFilter.value = paramWfa.toLowerCase(); hasActiveFilters = true; }
         if (paramWflh && wflhFilter) { wflhFilter.value = paramWflh.toLowerCase(); hasActiveFilters = true; }
+        if (paramMuac && muacFilter) { muacFilter.value = paramMuac.toLowerCase(); hasActiveFilters = true; }
 
         if (hasActiveFilters) {
             // Expand the advanced filters panel if any advanced filters are active
@@ -1032,6 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.querySelectorAll('.btn-open-archive').forEach(btn => {
         btn.addEventListener('click', () => {
+            closeOpenActionMenu();
             const childId = btn.getAttribute('data-child-id');
             openArchiveModal(childId);
         });
@@ -1089,20 +1171,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const btn = e.target.closest('.action-menu-btn');
         if (btn) {
             const menu = btn.nextElementSibling;
-            const isOpen = !menu.classList.contains('hidden');
+            if (!menu || !menu.classList.contains('action-menu')) {
+                return;
+            }
 
-            // Close all others
-            document.querySelectorAll('.action-menu').forEach(m => m.classList.add('hidden'));
-            document.querySelectorAll('.action-menu-btn').forEach(b => b.setAttribute('aria-expanded', 'false'));
+            const isOpen = !menu.classList.contains('hidden');
+            closeOpenActionMenu();
 
             if (!isOpen) {
                 menu.classList.remove('hidden');
                 btn.setAttribute('aria-expanded', 'true');
+                openActionMenu = menu;
             }
             e.stopPropagation();
-        } else {
-            document.querySelectorAll('.action-menu').forEach(m => m.classList.add('hidden'));
-            document.querySelectorAll('.action-menu-btn').forEach(b => b.setAttribute('aria-expanded', 'false'));
+            return;
+        }
+
+        if (!e.target.closest('.action-menu')) {
+            closeOpenActionMenu();
         }
     });
 

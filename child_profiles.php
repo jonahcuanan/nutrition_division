@@ -341,12 +341,12 @@ $baseSql = 'SELECT c.*, b.barangay_name, g.first_name AS guardian_first, g.last_
              WHERE grc.child_id = c.child_id 
              AND MONTH(grc.measurement_date) = MONTH(CURRENT_DATE) 
              AND YEAR(grc.measurement_date) = YEAR(CURRENT_DATE)
-             AND grc.is_muac_only = FALSE) as month_measurement_count,
+             AND COALESCE(grc.weight, 0) > 0 AND COALESCE(grc.height, 0) > 0) as month_measurement_count,
             (SELECT COUNT(*) FROM growth_records grc 
              WHERE grc.child_id = c.child_id 
              AND MONTH(grc.measurement_date) = MONTH(CURRENT_DATE) 
              AND YEAR(grc.measurement_date) = YEAR(CURRENT_DATE)
-             AND (grc.is_muac_only = TRUE OR grc.muac_measurement > 0)) as month_muac_count
+             AND COALESCE(grc.muac_measurement, 0) > 0) as month_muac_count
     FROM children c
     LEFT JOIN barangays b ON c.barangay_id = b.barangay_id
     LEFT JOIN guardians g ON c.guardian_id = g.guardian_id
@@ -606,11 +606,19 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
     <div id="toastContainer"></div>
 
     <!-- Page Header -->
-    <div class="no-print flex items-center gap-3 mb-5">
-        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-lg">👶</div>
+    <div class="no-print flex items-center gap-3 mb-5 justify-between">
+        <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-lg">👶</div>
+            <div>
+                <h1 class="text-lg font-bold text-slate-900">Child Profiles</h1>
+                <p class="mt-0.5 text-xs text-slate-500">View and manage all registered children</p>
+            </div>
+        </div>
         <div>
-            <h1 class="text-lg font-bold text-slate-900">Child Profiles</h1>
-            <p class="mt-0.5 text-xs text-slate-500">View and manage all registered children</p>
+            <span id="rowCount" class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-3 py-1.5 text-[0.72rem] font-bold text-emerald-800 shadow-sm whitespace-nowrap">
+                <span id="rowCountNumber" class="inline-flex min-w-7 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-[0.72rem] font-extrabold leading-none text-white"><?= (int)$totalChildren ?></span>
+                <span class="uppercase tracking-[0.12em]">records</span>
+            </span>
         </div>
     </div>
 
@@ -623,15 +631,18 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 <svg class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input type="text" id="searchInput" placeholder="Search name, address, barangay, caregiver…" class="w-full rounded-md border border-slate-300 bg-white py-2 pl-7 pr-3 text-[0.8rem] text-slate-900 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
             </div>
-            <select id="sexFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
-                <option value="">All Sex</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
+            <?php if ($isAdmin): ?>
+            <select id="barangayFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
+                <option value="">All Barangays</option>
+                <?php foreach ($uniqueBarangays as $b): ?>
+                    <option value="<?= strtolower(htmlspecialchars($b)) ?>"><?= htmlspecialchars($b) ?></option>
+                <?php endforeach; ?>
             </select>
-            <select id="ipFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
-                <option value="">All IP Status</option>
-                <option value="yes">IP</option>
-                <option value="no">Non-IP</option>
+            <?php endif; ?>
+            <select id="sexFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
+                <option value="">All Sex (Boys & Girls)</option>
+                <option value="male">Male (Boys)</option>
+                <option value="female">Female (Girls)</option>
             </select>
             <button type="button" id="btnToggleFilters" class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
@@ -650,53 +661,53 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 New Measurement Period
             </button>
             <?php endif; ?>
-            <span id="rowCount" class="ml-auto text-[0.72rem] text-slate-400 whitespace-nowrap"><?= $totalChildren ?> records</span>
+            
         </div>
 
         <!-- Advanced Filters -->
         <div id="advancedFiltersPanel" class="hidden flex-col md:flex-row flex-wrap items-stretch md:items-center gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-lg shadow-inner w-full mt-1">
-            <div class="flex items-center shrink-0 mb-1 md:mb-0 mr-2">
-                <span class="text-[0.75rem] font-bold text-slate-500 uppercase tracking-wide">Filter By:</span>
-            </div>
-            
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:flex flex-wrap items-center gap-2.5 w-full md:w-auto flex-1">
-                <?php if ($isAdmin): ?>
-                <select id="barangayFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 col-span-2 sm:col-span-1 lg:w-auto">
-                    <option value="">All Barangays</option>
-                    <?php foreach ($uniqueBarangays as $b): ?>
-                        <option value="<?= strtolower(htmlspecialchars($b)) ?>"><?= htmlspecialchars($b) ?></option>
-                    <?php endforeach; ?>
+                <select id="ipFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 w-full col-span-2 sm:col-span-1 lg:w-auto">
+                    <option value="">All Groups</option>
+                    <option value="yes">Indigenous</option>
+                    <option value="no">Non-Indigenous</option>
                 </select>
-                <?php endif; ?>
 
                 <div class="flex items-center gap-2 col-span-2 sm:col-span-1 lg:w-auto">
-                    <input type="number" id="ageMinFilter" placeholder="Min Age (mo)" class="h-9 w-1/2 lg:w-[110px] rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" min="0" />
+                    <input type="number" id="ageMinFilter" placeholder="Min Age (months)" class="h-9 w-1/2 lg:w-[110px] rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" min="0" />
                     <span class="text-slate-400 text-xs font-medium">-</span>
-                    <input type="number" id="ageMaxFilter" placeholder="Max Age (mo)" class="h-9 w-1/2 lg:w-[110px] rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" min="0" />
+                    <input type="number" id="ageMaxFilter" placeholder="Max Age (months)" class="h-9 w-1/2 lg:w-[110px] rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" min="0" />
                 </div>
 
                 <select id="hfaFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 w-full col-span-2 sm:col-span-1 lg:w-auto">
-                    <option value="">Height for Age</option>
-                    <option value="normal">Normal</option>
+                    <option value="">Height-for-Age</option>
+                    <option value="normal">Normal Height</option>
                     <option value="tall">Tall</option>
                     <option value="stunted">Stunted</option>
                     <option value="severely stunted">Severely Stunted</option>
                 </select>
 
                 <select id="wfaFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 w-full col-span-2 sm:col-span-1 lg:w-auto">
-                    <option value="">Weight for Age</option>
-                    <option value="normal">Normal</option>
+                    <option value="">Weight-for-Age</option>
+                    <option value="normal">Normal Weight</option>
                     <option value="underweight">Underweight</option>
                     <option value="severely underweight">Severely Underweight</option>
                     <option value="overweight">Overweight</option>
                 </select>
 
                 <select id="wflhFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 w-full col-span-2 sm:col-span-1 lg:w-auto">
-                    <option value="">Weight for L/HT</option>
-                    <option value="normal">Normal</option>
+                    <option value="">Weight-for-Length/Height </option>
+                    <option value="normal">Normal Weight for Height</option>
                     <option value="overweight">Overweight</option>
                     <option value="obese">Obese</option>
-                    <option value="wasted">Wasted</option>
+                    <option value="wasted">Wasted </option>
+                    <option value="severely wasted">Severely Wasted </option>
+                </select>
+
+                <select id="muacFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 w-full col-span-2 sm:col-span-1 lg:w-auto">
+                    <option value="">MUAC Status</option>
+                    <option value="normal">Normal</option>
+                    <option value="moderately wasted">Moderately Wasted</option>
                     <option value="severely wasted">Severely Wasted</option>
                 </select>
                 
@@ -900,7 +911,8 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                     data-age="<?= $ageMonths !== null ? (int)$ageMonths : ($currentAgeMonths !== null ? (int)$currentAgeMonths : '') ?>"
                     data-hfa="<?= strtolower($hfaStatus) ?>"
                     data-wfa="<?= strtolower($wfaStatus) ?>"
-                    data-wflh="<?= strtolower($wflStatus) ?>">
+                    data-wflh="<?= strtolower($wflStatus) ?>"
+                    data-muac="<?= strtolower($muacStatus) ?>">
                     <td class="print-center"><?= $printSeq ?></td>
                     <td class="print-left"><?= htmlspecialchars($addressDisplay) ?></td>
                     <td class="print-left print-barangay-col"><?= htmlspecialchars($barangayDisplay) ?></td>
@@ -1081,6 +1093,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                     data-wfa="<?= strtolower(htmlspecialchars($wfaStatus)) ?>"
                     data-hfa="<?= strtolower(htmlspecialchars($hfaStatus)) ?>"
                     data-wflh="<?= strtolower(htmlspecialchars($wflStatus)) ?>"
+                    data-muac="<?= strtolower(htmlspecialchars($muacStatus)) ?>"
                     class="hover:bg-slate-50"
                 >
                     <td class="border border-slate-300 px-2 py-1.5 align-middle text-slate-700" data-label="Address / Location">

@@ -387,7 +387,126 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
     }
 }
 
-// NOTE: Admin user-edit functionality removed to disable edit actions from Users Account.
+// NOTE: Admin user-edit functionality has been restored.
+
+// Handle user update (Admins only)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
+    if (!$isAdmin) {
+        $errorMessage = 'You do not have permission to edit users.';
+        if (isset($_POST['_ajax'])) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => $errorMessage]);
+            exit;
+        }
+    } else {
+        $targetUserId    = (int)($_POST['target_user_id'] ?? 0);
+        $firstName       = trim($_POST['first_name'] ?? '');
+        $middleName      = trim($_POST['middle_name'] ?? '');
+        $lastName        = trim($_POST['last_name'] ?? '');
+        $suffix          = trim($_POST['suffix'] ?? '');
+        $contactNumber   = trim($_POST['contact_number'] ?? '');
+        $email           = trim($_POST['email'] ?? '');
+        $barangayId      = trim($_POST['barangay_id'] ?? '');
+        $passwordRaw     = $_POST['password'] ?? '';
+        
+        $errors = [];
+        if ($targetUserId <= 0) $errors[] = 'Invalid user ID.';
+        if ($firstName === '' || $lastName === '' || $contactNumber === '' || $email === '') {
+            $errors[] = 'First Name, Last Name, Contact Number, and Email are required.';
+        }
+        
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Invalid email address.';
+        } elseif ($email !== '' && substr(strtolower($email), -10) !== '@gmail.com') {
+            $errors[] = 'Email address must end with @gmail.com.';
+        } elseif ($email !== '') {
+            $emailCheck = $conn->prepare('SELECT 1 FROM users WHERE email = ? AND user_id != ? LIMIT 1');
+            if ($emailCheck) {
+                $emailCheck->bind_param('si', $email, $targetUserId);
+                $emailCheck->execute();
+                $emailCheck->store_result();
+                if ($emailCheck->num_rows > 0) $errors[] = 'This email address is already in use by another account.';
+                $emailCheck->close();
+            }
+        }
+        
+        if (empty($errors)) {
+            $nameCheck = $conn->prepare('SELECT 1 FROM users WHERE LOWER(TRIM(first_name)) = LOWER(?) AND LOWER(TRIM(last_name)) = LOWER(?) AND user_id != ? LIMIT 1');
+            if ($nameCheck) {
+                $nameCheck->bind_param('ssi', $firstName, $lastName, $targetUserId);
+                $nameCheck->execute();
+                $nameCheck->store_result();
+                if ($nameCheck->num_rows > 0) $errors[] = 'A user with the same first and last name already exists.';
+                $nameCheck->close();
+            }
+        }
+
+        // Fetch current role to determine if barangay can be assigned
+        $currentRoleTarget = '';
+        $roleCheck = $conn->prepare('SELECT role FROM users WHERE user_id = ?');
+        if ($roleCheck) {
+            $roleCheck->bind_param('i', $targetUserId);
+            $roleCheck->execute();
+            $roleCheck->bind_result($currentRoleTarget);
+            $roleCheck->fetch();
+            $roleCheck->close();
+        }
+
+        $roleNeedsBarangay = in_array($currentRoleTarget, ['Barangay Nutrition Scholars', 'Health Worker'], true);
+        if ($roleNeedsBarangay && ($barangayId === '' || !ctype_digit($barangayId))) {
+            $errors[] = 'Barangay selection is required for this role.';
+        }
+        $barangayParam = ($currentRoleTarget === 'Staff') ? null : (($barangayId !== '' && ctype_digit($barangayId)) ? (int)$barangayId : null);
+
+        if (empty($errors)) {
+            // Update the user
+            if ($passwordRaw !== '') {
+                if (strlen($passwordRaw) < 6) {
+                    $errors[] = 'Password must be at least 6 characters long.';
+                } else {
+                    $hashed = password_hash(strtoupper($passwordRaw), PASSWORD_DEFAULT);
+                    $stmt = $conn->prepare('UPDATE users SET first_name=?, middle_name=?, last_name=?, suffix=?, contact_number=?, email=?, password=?, barangay_id=? WHERE user_id=?');
+                    if ($stmt) {
+                        $stmt->bind_param('sssssssii', $firstName, $middleName, $lastName, $suffix, $contactNumber, $email, $hashed, $barangayParam, $targetUserId);
+                        if ($stmt->execute()) {
+                            $successMessage = 'User account updated successfully.';
+                            log_user_activity($conn, $sessionUserId, 'edit_profile', "Edited user $targetUserId account details and password.");
+                        } else {
+                            $errors[] = 'Failed to update user account.';
+                        }
+                        $stmt->close();
+                    }
+                }
+            } else {
+                $stmt = $conn->prepare('UPDATE users SET first_name=?, middle_name=?, last_name=?, suffix=?, contact_number=?, email=?, barangay_id=? WHERE user_id=?');
+                if ($stmt) {
+                    $stmt->bind_param('ssssssii', $firstName, $middleName, $lastName, $suffix, $contactNumber, $email, $barangayParam, $targetUserId);
+                    if ($stmt->execute()) {
+                        $successMessage = 'User account updated successfully.';
+                        log_user_activity($conn, $sessionUserId, 'edit_profile', "Edited user $targetUserId account details.");
+                    } else {
+                        $errors[] = 'Failed to update user account.';
+                    }
+                    $stmt->close();
+                }
+            }
+        }
+        
+        if (!empty($errors)) {
+            $errorMessage = implode(' ', $errors);
+        }
+        
+        if (isset($_POST['_ajax'])) {
+            header('Content-Type: application/json');
+            if ($successMessage) {
+                echo json_encode(['success' => true, 'message' => $successMessage]);
+            } else {
+                echo json_encode(['success' => false, 'message' => $errorMessage ?: 'Unknown error occurred.']);
+            }
+            exit;
+        }
+    }
+}
 
 // Fetch activity logs
 $activityLogResult = null;
@@ -403,7 +522,7 @@ if (isset($_GET['tab']) && $_GET['tab'] === 'activity_logs') {
 $userAccountRows = [];
 $totalUsers = 0;
 if (isset($_GET['tab']) && $_GET['tab'] === 'users_account') {
-    $result = $conn->query("SELECT u.user_id, u.first_name, u.middle_name, u.last_name, u.suffix, u.role, u.contact_number, u.email, b.barangay_name FROM users u LEFT JOIN barangays b ON u.barangay_id = b.barangay_id WHERE u.role != 'Admin' ORDER BY u.last_name ASC, u.first_name ASC");
+    $result = $conn->query("SELECT u.user_id, u.first_name, u.middle_name, u.last_name, u.suffix, u.role, u.contact_number, u.email, u.barangay_id, b.barangay_name FROM users u LEFT JOIN barangays b ON u.barangay_id = b.barangay_id WHERE u.role != 'Admin' ORDER BY u.last_name ASC, u.first_name ASC");
     if ($result) {
         while ($row = $result->fetch_assoc()) {
             $userAccountRows[] = $row;
@@ -477,7 +596,33 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                     <span class="table-card-title">Activity Logs</span>
                     <div class="table-card-sub">System-wide user activity history</div>
                 </div>
-                <div class="table-header-controls">
+                 <div class="table-header-controls" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+                    <div class="filter-wrap">
+                        <select id="logRoleFilter" onchange="filterLogsTable()" class="filter-select">
+                            <option value="">All Roles</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Health Worker">Health Worker</option>
+                            <option value="Staff">Staff</option>
+                            <option value="Barangay Nutrition Scholars">BNS</option>
+                        </select>
+                    </div>
+                    <div class="filter-wrap">
+                        <select id="logMonthFilter" onchange="filterLogsTable()" class="filter-select">
+                            <option value="">All Months</option>
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
                     <div class="search-wrap">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <input type="text" id="logsSearchInput" placeholder="Search user ID, name, role, activity..." oninput="filterLogsTable()">
@@ -518,13 +663,20 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
 
                                 // Parse datetime
                                 $dt = DateTime::createFromFormat('Y-m-d H:i:s', $row['activity_time']);
-                                $logDate = $dt ? $dt->format('M d, Y') : $row['activity_time'];
-                                $logTime = $dt ? $dt->format('h:i A')  : '';
-                                $logRole = $row['role'] ?? '';
+                                $logDate  = $dt ? $dt->format('M d, Y') : $row['activity_time'];
+                                $logTime  = $dt ? $dt->format('h:i A')  : '';
+                                $logMonth = $dt ? (int)$dt->format('n') : 0; // 1-12
+                                $logRole    = $row['role'] ?? '';
                                 $logDetails = trim($row['details'] ?? '');
 
                                 // Activity badge config
                                 $actType = $row['activity_type'];
+                                // Determine effective activity key for data-activity attribute
+                                $actKey = $actType;
+                                if ($actType === 'edit_profile' && stripos($logDetails, 'Measurement:') !== false) {
+                                    $actKey = 'update_measurement';
+                                }
+
                                 $badgeMap = [
                                     'login'           => ['label' => 'Logged In',         'icon' => '🔓', 'bg' => '#d1fae5', 'color' => '#065f46'],
                                     'logout'          => ['label' => 'Logged Out',        'icon' => '🔒', 'bg' => '#fee2e2', 'color' => '#991b1b'],
@@ -534,7 +686,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                     'update_muac'     => ['label' => 'Updated MUAC',      'icon' => '📐', 'bg' => '#dcfce7', 'color' => '#166534'],
                                     'generate_report' => ['label' => 'Generated Report',  'icon' => '📄', 'bg' => '#fef9c3', 'color' => '#713f12'],
                                     'change_password' => ['label' => 'Changed Password',  'icon' => '🔑', 'bg' => '#ffedd5', 'color' => '#92400e'],
-                                    'clear_measurements'=>['label'=> 'Cleared Measurements','icon'=> '🗑️','bg' => '#f3f4f6', 'color' => '#374151'],
+                                    'clear_measurements'=> ['label'=> 'Cleared Measurements','icon'=> '🗑️','bg' => '#f3f4f6', 'color' => '#374151'],
                                     'intervention_type_add' => ['label' => 'Added Intervention Type', 'icon' => '🧾', 'bg' => '#e0f2fe', 'color' => '#0369a1'],
                                     'intervention_add'      => ['label' => 'Added Intervention',      'icon' => '✅', 'bg' => '#dcfce7', 'color' => '#166534'],
                                     'intervention_edit'     => ['label' => 'Updated Intervention',    'icon' => '✏️', 'bg' => '#fef9c3', 'color' => '#854d0e'],
@@ -549,7 +701,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                     'archive_child'         => ['label' => 'Archived Child Profile',  'icon' => '🗂️', 'bg' => '#ffe4e6', 'color' => '#9f1239'],
                                     'restore_child'         => ['label' => 'Restored Child Profile',  'icon' => '♻️', 'bg' => '#dcfce7', 'color' => '#166534'],
                                 ];
-                                if ($actType === 'edit_profile' && stripos($logDetails, 'Measurement:') !== false) {
+                                if ($actKey === 'update_measurement') {
                                     $badge = ['label' => 'Updated Measurement', 'icon' => '📏', 'bg' => '#dbeafe', 'color' => '#1d4ed8'];
                                 } else {
                                     $badge = $badgeMap[$actType] ?? [
@@ -560,7 +712,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                     ];
                                 }
                             ?>
-                                <tr>
+                                <tr data-role="<?= htmlspecialchars($logRole) ?>" data-activity="<?= htmlspecialchars($actKey) ?>" data-month="<?= $logMonth ?>">
                                     <td><span class="ua-username"><?= htmlspecialchars(str_pad((string)$row['user_id'], 6, '0', STR_PAD_LEFT)) ?></span></td>
                                     <td><?= htmlspecialchars($logFullName) ?></td>
                                     <td><?= htmlspecialchars($logRole) ?></td>
@@ -606,12 +758,32 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
             <div class="table-card-header">
                 <div class="table-card-header-left">
                     <span class="table-card-title">Users Directory</span>
-                    <div class="table-card-sub">Total users: <?= (int)$totalUsers ?></div>
+                    <div class="table-card-sub" style="display:flex;align-items:center;gap:8px;">
+                        <span>Total Active Accounts</span>
+                        <span style="background:var(--surface-3);color:var(--ink);border:1px solid var(--border-2);padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;"><?= (int)$totalUsers ?></span>
+                    </div>
                 </div>
-                <div class="table-header-controls">
+                <div class="table-header-controls" style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
+                    <div class="filter-wrap">
+                        <select id="roleFilter" onchange="filterUsersTable()" class="filter-select">
+                            <option value="">All Roles</option>
+                            <option value="Health Worker">Health Worker</option>
+                            <option value="Staff">Staff</option>
+                            <option value="Barangay Nutrition Scholars">Barangay Nutrition Scholars (BNS)</option>
+                        </select>
+                    </div>
+                    <div class="filter-wrap">
+                        <select id="barangayFilter" onchange="filterUsersTable()" class="filter-select">
+                            <option value="">All Barangays</option>
+                            <option value="Unassigned">Unassigned</option>
+                            <?php foreach ($barangayOptions as $b): ?>
+                                <option value="<?= htmlspecialchars($b['barangay_name']) ?>"><?= htmlspecialchars($b['barangay_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                     <div class="search-wrap">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        <input type="text" id="usersSearchInput" placeholder="Search name, user ID, role, barangay..." oninput="filterUsersTable()">
+                        <input type="text" id="usersSearchInput" placeholder="Search name, user ID..." oninput="filterUsersTable()">
                     </div>
                 </div>
             </div>
@@ -626,7 +798,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                             <th>Assigned Barangay</th>
                             <th>Contact Number</th>
                             <th>Email Address</th>
-                            <!-- Actions column removed -->
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -656,7 +828,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                     $roleDisplay = 'HW';
                                 }
                             ?>
-                            <tr>
+                            <tr data-role="<?= htmlspecialchars($roleRaw) ?>" data-barangay="<?= htmlspecialchars($barangayName) ?>">
                                 <td><span class="ua-username"><?= htmlspecialchars(str_pad((string)$row['user_id'], 6, '0', STR_PAD_LEFT)) ?></span></td>
                                 <td><?= htmlspecialchars($fullName) ?></td>
                                 <td title="<?= htmlspecialchars($roleRaw) ?>"><?= htmlspecialchars($roleDisplay) ?></td>
@@ -669,7 +841,22 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                 </td>
                                 <td class="ua-contact"><?= $contactNumber !== '' ? htmlspecialchars($contactNumber) : '<span class="ua-dash">&mdash;</span>' ?></td>
                                 <td class="ua-email"><?= $email !== '' ? htmlspecialchars($email) : '<span class="ua-dash">&mdash;</span>' ?></td>
-                                <!-- Actions cell removed -->
+                                <td>
+                                    <button class="btn btn-outline btn-compact" onclick="openEditUserModal({
+                                        user_id: <?= (int)$row['user_id'] ?>,
+                                        first_name: <?= htmlspecialchars(json_encode($row['first_name'] ?? '')) ?>,
+                                        middle_name: <?= htmlspecialchars(json_encode($row['middle_name'] ?? '')) ?>,
+                                        last_name: <?= htmlspecialchars(json_encode($row['last_name'] ?? '')) ?>,
+                                        suffix: <?= htmlspecialchars(json_encode($row['suffix'] ?? '')) ?>,
+                                        contact_number: <?= htmlspecialchars(json_encode($row['contact_number'] ?? '')) ?>,
+                                        email: <?= htmlspecialchars(json_encode($row['email'] ?? '')) ?>,
+                                        barangay_id: <?= htmlspecialchars(json_encode($row['barangay_id'] ?? '')) ?>,
+                                        role: <?= htmlspecialchars(json_encode($row['role'] ?? '')) ?>
+                                    })">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                        Edit
+                                    </button>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
@@ -995,7 +1182,101 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
 </div>
 <?php endif; ?>
 
-<!-- Edit user modal removed: admin edit actions disabled -->
+<!-- Edit User Modal -->
+<?php if ($isAdmin): ?>
+<div class="modal-overlay" id="editUserModal">
+    <div class="modal-backdrop" onclick="closeEditModal()"></div>
+    <div class="modal-box">
+        <div class="modal-header">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div class="modal-header-icon" style="background:var(--blue-light);">✏️</div>
+                <div>
+                    <div class="modal-title">Edit User</div>
+                    <div class="modal-sub">Update account details</div>
+                </div>
+            </div>
+            <button type="button" class="modal-close" onclick="closeEditModal()" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+            <form method="post" action="" id="editUserForm">
+                <input type="hidden" name="update_user" value="1">
+                <input type="hidden" name="target_user_id" id="editTargetUserId" value="">
+                
+                <div class="section-label">Account Details</div>
+                <div class="form-grid-2">
+                    <div class="field">
+                        <label>User ID</label>
+                        <input type="text" id="editUserIdDisplay" readonly class="input-readonly-locked no-click">
+                    </div>
+                    <div class="field" id="editBarangayField">
+                        <label>Assign Barangay</label>
+                        <select name="barangay_id" id="editBarangaySelect">
+                            <option value="">Select barangay</option>
+                            <?php foreach ($barangayOptions as $b): ?>
+                                <option value="<?= $b['barangay_id'] ?>"><?= htmlspecialchars($b['barangay_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <span class="hint">Cannot assign for Staff accounts.</span>
+                    </div>
+                </div>
+
+                <div class="section-label">Personal Information</div>
+                <div class="form-grid-2">
+                    <div class="field">
+                        <label>First Name <span class="req">*</span></label>
+                        <input type="text" name="first_name" id="editFirstName" required>
+                    </div>
+                    <div class="field">
+                        <label>Middle Name</label>
+                        <input type="text" name="middle_name" id="editMiddleName">
+                    </div>
+                </div>
+                <div class="form-grid-2">
+                    <div class="field">
+                        <label>Last Name <span class="req">*</span></label>
+                        <input type="text" name="last_name" id="editLastName" required>
+                    </div>
+                    <div class="field">
+                        <label>Suffix</label>
+                        <input type="text" name="suffix" id="editSuffix">
+                    </div>
+                </div>
+
+                <div class="section-label">Contact Information</div>
+                <div class="form-grid-2">
+                    <div class="field">
+                        <label>Contact Number <span class="req">*</span></label>
+                        <input type="text" name="contact_number" id="editContactNumber" required>
+                    </div>
+                    <div class="field">
+                        <label>Email Address <span class="req">*</span></label>
+                        <input type="email" name="email" id="editEmail" required
+                               pattern="[a-zA-Z0-9._%+-]+@gmail\.com"
+                               title="Email address must end with @gmail.com">
+                    </div>
+                </div>
+
+                <div class="section-label">Change Password</div>
+                <div class="field">
+                    <label>New Password</label>
+                    <div class="password-field">
+                        <input type="password" name="password" id="editPassword" placeholder="Leave blank to keep current">
+                        <button type="button" class="pw-toggle" data-target="editPassword" aria-label="Show password">Show</button>
+                    </div>
+                    <span class="hint">Min 6 characters. Leave empty if you don't want to change the password.</span>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+            <button type="submit" form="editUserForm" class="btn btn-primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save Changes
+            </button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <script src="javascript/account_settings.js?v=<?= filemtime(__DIR__ . '/javascript/account_settings.js') ?>"></script>
 </body>

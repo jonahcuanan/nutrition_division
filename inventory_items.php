@@ -281,20 +281,20 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             </div>
             <!-- Category filter removed as per user request -->
             <select class="filter-select" id="stockFilter">
-                <option value="">All Stock Levels</option>
-                <option value="low">⚠️ Low Stock (≤5)</option>
-                <option value="ok">✅ Sufficient Stock</option>
+                <option value="">Show All Stock Levels</option>
+                <option value="low">⚠️ Low Stock (5 or fewer left)</option>
+                <option value="ok">✅ Sufficient Stock (More than 5 left)</option>
             </select>
             <select class="filter-select" id="expirationFilter">
-                <option value="">All Expiration</option>
-                <option value="expired">🔴 Expired</option>
-                <option value="soon">🟠 Expiring Soon</option>
-                <option value="good">🟢 Good / No Expiry</option>
+                <option value="">Show All Expiration Statuses</option>
+                <option value="expired">🔴 Already Expired</option>
+                <option value="soon">🟠 Expiring Soon (Within 30 days)</option>
+                <option value="good">🟢 Good (Not Expired / No Expiry)</option>
             </select>
             <select class="filter-select" id="availabilityFilter">
-                <option value="">All Availability</option>
-                <option value="in">📦 In Stock</option>
-                <option value="out">❌ Out of Stock</option>
+                <option value="">Show All Stock Availability</option>
+                <option value="in">📦 In Stock (Available)</option>
+                <option value="out">❌ Out of Stock (Empty)</option>
             </select>
             <span class="row-count" id="invCount"><?= $totalItems ?> item<?= $totalItems !== 1 ? 's' : '' ?></span>
         </div>
