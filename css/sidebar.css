@@ -890,3 +890,27 @@ body.sb-lock {
     cursor: not-allowed !important;
     pointer-events: none !important;
 }
+
+/* Ensure all buttons have pointer (hand/thumb) cursor on hover */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.btn,
+.button,
+[role="button"] {
+    cursor: pointer !important;
+}
+
+/* Ensure disabled buttons show the not-allowed cursor */
+button:disabled,
+input[type="button"]:disabled,
+input[type="submit"]:disabled,
+input[type="reset"]:disabled,
+.btn:disabled,
+.button:disabled,
+[role="button"]:disabled,
+.disabled,
+[disabled] {
+    cursor: not-allowed !important;
+}

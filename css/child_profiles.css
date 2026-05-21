@@ -873,3 +873,28 @@ body.update-modal-open .sb-mobile-bar {
 .print-report-mode .print-only {
     display: block !important;
 }
+
+/* ── Global: pointer cursor for all interactive buttons, selects & role=button ── */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+select,
+.btn,
+.button,
+[role="button"] {
+    cursor: pointer !important;
+}
+
+button:disabled,
+input[type="button"]:disabled,
+input[type="submit"]:disabled,
+input[type="reset"]:disabled,
+select:disabled,
+.btn:disabled,
+.button:disabled,
+[role="button"]:disabled,
+.disabled,
+[disabled] {
+    cursor: not-allowed !important;
+}
