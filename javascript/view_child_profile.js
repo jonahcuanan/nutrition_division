@@ -1,4 +1,40 @@
 document.addEventListener('DOMContentLoaded', function () {
+    const showChartToast = (message) => {
+        let toast = document.getElementById('chart-click-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'chart-click-toast';
+            toast.style.position = 'fixed';
+            toast.style.bottom = '24px';
+            toast.style.right = '24px';
+            toast.style.backgroundColor = '#0f172a';
+            toast.style.color = '#f8fafc';
+            toast.style.padding = '12px 20px';
+            toast.style.borderRadius = '8px';
+            toast.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)';
+            toast.style.fontFamily = 'Arial, sans-serif';
+            toast.style.fontSize = '14px';
+            toast.style.fontWeight = '500';
+            toast.style.zIndex = '99999';
+            toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+            document.body.appendChild(toast);
+        }
+        
+        toast.textContent = message;
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+        
+        if (window.toastTimeout) {
+            clearTimeout(window.toastTimeout);
+        }
+        window.toastTimeout = setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(10px)';
+        }, 4000);
+    };
+
     const hasRecords = Array.isArray(window.childRecords) && window.childRecords.length > 0;
     const isCompactViewport = window.matchMedia('(max-width: 768px)').matches;
     const chartTickFontSize = isCompactViewport ? 9 : 11;
@@ -69,13 +105,57 @@ document.addEventListener('DOMContentLoaded', function () {
     ) => {
         const ctx = document.getElementById(id);
         if (!ctx) return;
+
+        const processedDatasets = datasets.map(ds => {
+            if (ds.label !== 'Child') {
+                return {
+                    ...ds,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHitRadius: 12
+                };
+            }
+            return {
+                ...ds,
+                pointHitRadius: 12
+            };
+        });
+
         new Chart(ctx, {
             type: 'line',
             data: {
-                datasets
+                datasets: processedDatasets
             },
             options: {
                 ...baseOpts,
+                onClick: (event, elements, chart) => {
+                    if (elements && elements.length > 0) {
+                        const firstEl = elements[0];
+                        const datasetIndex = firstEl.datasetIndex;
+                        const dataIndex = firstEl.index;
+                        const dataset = chart.data.datasets[datasetIndex];
+                        const point = dataset.data[dataIndex];
+                        
+                        const label = dataset.label;
+                        const x = point.x;
+                        const y = typeof point.y === 'number' ? point.y.toFixed(1) : point.y;
+                        
+                        const xUnit = xTitle.includes('Age') ? ' months' : ' cm';
+                        const yUnit = yTitle.includes('(kg)') ? ' kg' : (yTitle.includes('(cm)') ? ' cm' : '');
+                        
+                        let message = '';
+                        if (label === 'Child') {
+                            message = `Child record at ${x}${xUnit}: ${y}${yUnit} (${point.status || 'No status'})`;
+                        } else {
+                            message = `${label} threshold at ${x}${xUnit}: ${y}${yUnit}`;
+                        }
+                        
+                        showChartToast(message);
+                    }
+                },
+                onHover: (event, elements) => {
+                    event.native.target.style.cursor = elements && elements.length > 0 ? 'pointer' : 'default';
+                },
                 plugins: {
                     ...baseOpts.plugins,
                     tooltip: {
@@ -87,7 +167,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                     const unit = yTitle.includes('(kg)') ? ' kg' : (yTitle.includes('(cm)') ? ' cm' : '');
                                     return `${val}${unit} (${ctx.raw.status})`;
                                 }
-                                return `${ctx.dataset.label}: ${val}`;
+                                const unit = yTitle.includes('(kg)') ? ' kg' : (yTitle.includes('(cm)') ? ' cm' : '');
+                                return `${ctx.dataset.label}: ${val}${unit}`;
                             }
                         }
                     }

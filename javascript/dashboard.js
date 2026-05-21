@@ -1,4 +1,14 @@
 document.addEventListener("DOMContentLoaded", function () {
+    const dashboardDataEl = document.getElementById('dashboard-data');
+    let dashboardData = {};
+    if (dashboardDataEl) {
+        try {
+            dashboardData = JSON.parse(dashboardDataEl.textContent || '{}');
+        } catch (error) {
+            dashboardData = {};
+        }
+    }
+
     const welcomeNameEl = document.getElementById('welcomeName');
     function updateWelcomeName(name) {
         if (!welcomeNameEl) return;
@@ -27,9 +37,17 @@ document.addEventListener("DOMContentLoaded", function () {
         '#9c9ede', '#98df8a', '#c5b0d5', '#c49c94'
     ];
 
+    const bLabels = dashboardData.barangayLabels || window.barangayLabels || [];
+    const bData = dashboardData.barangayData || window.barangayData || [];
+    const gbLabels = dashboardData.genderBarangayLabels || window.genderBarangayLabels || [];
+    const gbMale = dashboardData.genderBarangayMale || window.genderBarangayMale || [];
+    const gbFemale = dashboardData.genderBarangayFemale || window.genderBarangayFemale || [];
+    const wfaData = dashboardData.wfaByBarangay || window.wfaByBarangay || {};
+    const hfaData = dashboardData.hfaByBarangay || window.hfaByBarangay || {};
+    const wflhData = dashboardData.wflhByBarangay || window.wflhByBarangay || {};
+    const muacData = dashboardData.muacByBarangay || window.muacByBarangay || {};
+
     // 1. Barangay Chart
-    const bLabels = window.barangayLabels || [];
-    const bData = window.barangayData || [];
     if (bData.length > 0) {
         const bColors = bLabels.map((_, idx) => barangayColors[idx % barangayColors.length]);
         new Chart(document.getElementById('barangayChart').getContext('2d'), {
@@ -51,10 +69,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // 2. Demographics per Barangay Chart
-    const gbLabels = window.genderBarangayLabels || [];
-    const gbMale = window.genderBarangayMale || [];
-    const gbFemale = window.genderBarangayFemale || [];
-
     if (gbLabels.length > 0) {
         new Chart(document.getElementById('genderBarangayChart').getContext('2d'), {
             type: 'bar',
@@ -89,7 +103,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // 3. WFA Chart per Barangay
-    const wfaData = window.wfaByBarangay || {};
     const wfaLabels = Object.keys(wfaData);
     const wfaEl = document.getElementById('wfaChart');
     if (wfaEl && wfaLabels.length > 0) {
@@ -142,7 +155,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // 4. HFA Chart per Barangay
-    const hfaData = window.hfaByBarangay || {};
     const hfaLabels = Object.keys(hfaData);
     const hfaEl = document.getElementById('hfaChart');
     if (hfaEl && hfaLabels.length > 0) {
@@ -195,7 +207,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // 5. WFL/H Chart per Barangay
-    const wflhData = window.wflhByBarangay || {};
     const wflhLabels = Object.keys(wflhData);
     const wflhEl = document.getElementById('wflhChart');
     if (wflhEl && wflhLabels.length > 0) {
@@ -254,7 +265,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // 6. MUAC Chart per Barangay
-    const muacData = window.muacByBarangay || {};
     const muacLabels = Object.keys(muacData);
     const muacEl = document.getElementById('muacChart');
     if (muacEl && muacLabels.length > 0) {

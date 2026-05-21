@@ -55,6 +55,16 @@ $hfa_by_barangay = [];
 $wflh_by_barangay = [];
 $muac_by_barangay = [];
 
+$periodIsNew = false;
+$measuredThisPeriod = 0;
+$totalActiveChildren = 0;
+$unmeasuredThisPeriod = 0;
+$progressPct = 0;
+$bannerBg = '';
+$bannerBorder = '';
+$bannerColor = '';
+$barColor = '';
+
 require_once 'growth_utils.php';
 
 if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
@@ -418,20 +428,20 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
         <section class="stats">
             <div class="stat-card">
                 <div class="stat-card-top">
-                    <span class="stat-card-label">Children Enrolled</span>
+                    <span class="stat-card-label">Total Child Records</span>
                     <div class="stat-card-icon icon-green"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
                 </div>
                 <h3 class="stat-number"><?= number_format($stats['children']) ?></h3>
-                <p class="stat-note">Total child records</p>
+                <p class="stat-note">Registered Children</p>
             </div>
 
             <div class="stat-card">
                 <div class="stat-card-top">
-                    <span class="stat-card-label">Indigenous People</span>
+                    <span class="stat-card-label">Total Indigenous People</span>
                     <div class="stat-card-icon icon-amber"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div>
                 </div>
                 <h3 class="stat-number"><?= number_format($stats['ip_count']) ?></h3>
-                <p class="stat-note">Active IP children</p>
+                <p class="stat-note">Registered IP Children</p>
             </div>
 
             <?php if ($canViewUserAndOperationalOverview): ?>
@@ -449,13 +459,13 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
             <?php if ($canViewBarangaysCovered && !$userBarangayId): ?>
             <div class="stat-card">
                 <div class="stat-card-top">
-                    <span class="stat-card-label">Barangays Covered</span>
+                    <span class="stat-card-label">Total Locations</span>
                     <div class="stat-card-icon icon-teal">
                         <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/></svg>
                     </div>
                 </div>
                 <h3 class="stat-number"><?= number_format($stats['barangays']) ?></h3>
-                <p class="stat-note">Total locations</p>
+                <p class="stat-note">Barangays Covered</p>
             </div>
             <?php elseif ($userBarangayId): ?>
             <div class="stat-card">
@@ -471,8 +481,38 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
             <?php endif; ?>
         </section>
 
-        <!-- Nutritional Status -->
-        <span class="section-label">Nutritional Status Overview</span>
+        <!-- Visual Analytics -->
+        <span class="section-label">Data Visualizations</span>
+        <section class="charts-section detailed-charts">
+
+            <div class="chart-panel">
+                <div class="chart-header">
+                    <h3>Children <?php if ($userBarangayName) echo 'in ' . htmlspecialchars($userBarangayName); else echo 'per Barangay'; ?></h3>
+                    <span class="muted">Distribution of enrolled children</span>
+                </div>
+                <div class="chart-container">
+                    <?php if (empty($barangay_chart_data)): ?>
+                        <div class="chart-empty">No data available</div>
+                    <?php else: ?>
+                        <canvas id="barangayChart"></canvas>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="chart-panel">
+                <div class="chart-header">
+                    <h3>Demographics <?php if ($userBarangayName) echo 'for ' . htmlspecialchars($userBarangayName); else echo 'per Barangay'; ?></h3>
+                    <span class="muted">Distribution by sex <?php if ($userBarangayName) echo 'in your area'; else echo 'and location'; ?></span>
+                </div>
+                <div class="chart-container">
+                    <?php if (empty($gender_barangay_labels)): ?>
+                        <div class="chart-empty">No data available</div>
+                    <?php else: ?>
+                        <canvas id="genderBarangayChart"></canvas>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </section>
 
         <?php
         $progressPct = $totalActiveChildren > 0 ? round(($measuredThisPeriod / $totalActiveChildren) * 100) : 0;
@@ -481,6 +521,9 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
         $bannerColor = $periodIsNew ? '#1a4f9c' : '#1e6b3b';
         $barColor    = $periodIsNew ? '#1a6ed8' : '#2ea86a';
         ?>
+
+        <!-- Nutritional Status -->
+        <span class="section-label">Nutritional Status Overview</span>
         <div style="background: <?= $bannerBg ?>; border: 1px solid <?= $bannerBorder ?>; border-radius: 14px; padding: 14px 18px; margin-bottom: 16px; font-family: Arial, Helvetica, sans-serif;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -582,39 +625,6 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
                         <div class="chart-empty">No data available</div>
                     <?php else: ?>
                         <canvas id="muacChart"></canvas>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </section>
-
-        <!-- Visual Analytics -->
-        <span class="section-label">Data Visualizations</span>
-        <section class="charts-section detailed-charts">
-
-            <div class="chart-panel">
-                <div class="chart-header">
-                    <h3>Demographics <?php if ($userBarangayName) echo 'for ' . htmlspecialchars($userBarangayName); else echo 'per Barangay'; ?></h3>
-                    <span class="muted">Distribution by sex <?php if ($userBarangayName) echo 'in your area'; else echo 'and location'; ?></span>
-                </div>
-                <div class="chart-container">
-                    <?php if (empty($gender_barangay_labels)): ?>
-                        <div class="chart-empty">No data available</div>
-                    <?php else: ?>
-                        <canvas id="genderBarangayChart"></canvas>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <div class="chart-panel">
-                <div class="chart-header">
-                    <h3>Children <?php if ($userBarangayName) echo 'in ' . htmlspecialchars($userBarangayName); else echo 'per Barangay'; ?></h3>
-                    <span class="muted">Distribution of enrolled children</span>
-                </div>
-                <div class="chart-container">
-                    <?php if (empty($barangay_chart_data)): ?>
-                        <div class="chart-empty">No data available</div>
-                    <?php else: ?>
-                        <canvas id="barangayChart"></canvas>
                     <?php endif; ?>
                 </div>
             </div>
@@ -723,17 +733,18 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
 
     </main>
     
-    <script>
-        window.barangayLabels = <?= json_encode($barangay_chart_labels) ?>;
-        window.barangayData = <?= json_encode($barangay_chart_data) ?>;
-        window.genderBarangayLabels = <?= json_encode($gender_barangay_labels) ?>;
-        window.genderBarangayMale = <?= json_encode($gender_barangay_male) ?>;
-        window.genderBarangayFemale = <?= json_encode($gender_barangay_female) ?>;
-
-        window.wfaByBarangay = <?= json_encode($wfa_by_barangay) ?>;
-        window.hfaByBarangay = <?= json_encode($hfa_by_barangay) ?>;
-        window.wflhByBarangay = <?= json_encode($wflh_by_barangay) ?>;
-        window.muacByBarangay = <?= json_encode($muac_by_barangay) ?>;
+    <script type="application/json" id="dashboard-data">
+        <?= json_encode([
+            'barangayLabels' => $barangay_chart_labels,
+            'barangayData' => $barangay_chart_data,
+            'genderBarangayLabels' => $gender_barangay_labels,
+            'genderBarangayMale' => $gender_barangay_male,
+            'genderBarangayFemale' => $gender_barangay_female,
+            'wfaByBarangay' => $wfa_by_barangay,
+            'hfaByBarangay' => $hfa_by_barangay,
+            'wflhByBarangay' => $wflh_by_barangay,
+            'muacByBarangay' => $muac_by_barangay,
+        ], JSON_UNESCAPED_SLASHES) ?>
     </script>
     <script src="javascript/dashboard.js"></script>
 
