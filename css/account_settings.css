@@ -388,15 +388,26 @@ main {
 }
 
 .btn-primary {
-    background: var(--teal);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.24);
+    background:#2563eb !important;
+    box-shadow: 0 4px 12px rgba(37,99,235,.24) !important;
 }
 
 .btn-primary:hover {
-    background: var(--teal-dark);
+    background: #2563eb !important;
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(13, 148, 136, 0.30);
+    box-shadow: 0 4px 12px rgba(37,99,235,.24) !important;
+}
+
+.btn-blue {
+    background:#2563eb !important;
+    color:#fff !important;
+    box-shadow: 0 4px 12px rgba(37,99,235,.24) !important;
+}
+
+.btn-blue:hover {
+    background:#1d4ed8 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(37,99,235,.30) !important;
 }
 
 .btn-outline {
@@ -1339,7 +1350,7 @@ main {
     letter-spacing: 0.08em;
     color: #ffffff;
     white-space: normal;
-    text-align: left;
+    text-align: center;
     border-right: 1px solid rgba(255, 255, 255, 0.07);
 }
 
@@ -1371,6 +1382,11 @@ main {
     width: 100px;
     max-width: 100px;
 }
+.user-account-table th:nth-child(2),
+.user-account-table td:nth-child(2) {
+    width: 250px;
+    max-width: 250px;
+}
 .user-account-table th:nth-child(3),
 .user-account-table td:nth-child(3) {
     width: 80px;
@@ -1380,6 +1396,11 @@ main {
 .user-account-table td:nth-child(5) {
     width: 160px;
     max-width: 160px;
+}
+.user-account-table th:nth-child(6),
+.user-account-table td:nth-child(6) {
+    width: 240px;
+    max-width: 240px;
 }
 
 .user-account-table tbody tr {
@@ -1719,28 +1740,38 @@ main {
 }
 
 .btn-edit-user {
-    background: var(--teal-light);
-    color: var(--teal-dark);
-    border-color: var(--teal-ring);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 13px;
+    background: #BA7517;
+    color: #fff;
+    border: 1.5px solid #BA7517;
+    border-radius: var(--radius-md);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: .79rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .18s, border-color .18s, color .18s, transform .15s;
+    text-decoration: none;
 }
 
 .btn-edit-user:hover {
-    background: var(--teal);
+    background: #965f12;
     color: #fff;
-    border-color: var(--teal);
-    transform: translateY(-2px) scale(1.08);
-    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.30);
+    border-color: #965f12;
+    transform: translateY(-1px);
 }
 
 .btn-edit-user:active {
-    transform: scale(0.95);
-    box-shadow: none;
+    transform: translateY(0) scale(0.98);
 }
 
 /* Keep Actions column cells vertically centred */
 .user-account-table td:last-child {
     text-align: center;
-    width: 60px;
+    width: 84px;
+    max-width: 84px;
 }
 
 /* readonly-locked display box (non-input version) */

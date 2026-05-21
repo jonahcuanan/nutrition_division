@@ -16,8 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const filterMonth = document.getElementById('filterMonth');
     const filterBarangay = document.getElementById('filterBarangay');
     const filterSex = document.getElementById('filterSex');
-    const filterAgeMin = document.getElementById('filterAgeMin');
-    const filterAgeMax = document.getElementById('filterAgeMax');
+    const filterAge = document.getElementById('filterAge');
     const filterSearch = document.getElementById('filterSearch');
     const btnResetFilters = document.getElementById('btnResetFilters');
 
@@ -193,8 +192,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const barangayValue= filterBarangay? filterBarangay.value.trim(): '';
         const sexValue     = filterSex     ? filterSex.value.trim()     : '';
         const searchValue  = filterSearch  ? filterSearch.value.trim().toLowerCase() : '';
-        const ageMinValue  = filterAgeMin && filterAgeMin.value !== '' ? parseInt(filterAgeMin.value, 10) : null;
-        const ageMaxValue  = filterAgeMax && filterAgeMax.value !== '' ? parseInt(filterAgeMax.value, 10) : null;
+        const ageVal       = filterAge && filterAge.value !== '' ? parseInt(filterAge.value, 10) : null;
 
         document.querySelectorAll('tbody tr.child-profile-row').forEach(row => {
             const dataCell   = row.querySelector('td[data-month]');
@@ -211,11 +209,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (visible && monthValue    && rowMonth    !== monthValue)    visible = false;
             if (visible && barangayValue && rowBarangay !== barangayValue) visible = false;
             if (visible && sexValue      && rowSex      !== sexValue)      visible = false;
-            if (visible && ageMinValue !== null) {
-                if (rowAge === null || rowAge < ageMinValue) visible = false;
-            }
-            if (visible && ageMaxValue !== null) {
-                if (rowAge === null || rowAge > ageMaxValue) visible = false;
+            if (visible && ageVal !== null) {
+                if (rowAge === null || rowAge !== ageVal) visible = false;
             }
             if (visible && searchValue) {
                 if (!rowName.includes(searchValue) && !rowAddress.includes(searchValue)) visible = false;
@@ -229,8 +224,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (filterMonth)    filterMonth.addEventListener('change', applyFilters);
     if (filterBarangay) filterBarangay.addEventListener('change', applyFilters);
     if (filterSex)      filterSex.addEventListener('change', applyFilters);
-    if (filterAgeMin)   filterAgeMin.addEventListener('input', applyFilters);
-    if (filterAgeMax)   filterAgeMax.addEventListener('input', applyFilters);
+    if (filterAge)      filterAge.addEventListener('input', applyFilters);
     if (filterSearch)   filterSearch.addEventListener('input', applyFilters);
 
     if (btnResetFilters) {
@@ -239,8 +233,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (filterMonth)     filterMonth.value = '';
             if (filterBarangay)  filterBarangay.value = '';
             if (filterSex)       filterSex.value = '';
-            if (filterAgeMin)    filterAgeMin.value = '';
-            if (filterAgeMax)    filterAgeMax.value = '';
+            if (filterAge)       filterAge.value = '';
             if (filterSearch)    filterSearch.value = '';
             applyFilters();
         });

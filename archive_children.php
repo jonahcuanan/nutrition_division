@@ -172,7 +172,7 @@ if ($isBns) {
     $sql .= " AND c.barangay_id = " . (int)$assignedBarangayId;
 }
 
-$sql .= " ORDER BY c.status_date DESC";
+$sql .= " ORDER BY b.barangay_name ASC, c.last_name ASC, c.first_name ASC";
 $result = $conn->query($sql);
 
 // Collect rows + build barangay list
@@ -332,13 +332,10 @@ sort($uniqueBarangays);
                     <option value="<?= strtolower(htmlspecialchars($bn)) ?>"><?= htmlspecialchars($bn) ?></option>
                 <?php endforeach; ?>
             </select>
-            <!-- Age Range -->
+            <!-- Age Direct Input -->
             <div class="flex items-center gap-2">
-                <input type="number" id="ageMinFilter" placeholder="Min Age (mo)" min="0"
-                    class="h-9 w-[105px] rounded-md border border-slate-300 bg-white px-3 text-[0.85rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
-                <span class="text-slate-400 text-xs font-medium">–</span>
-                <input type="number" id="ageMaxFilter" placeholder="Max Age (mo)" min="0"
-                    class="h-9 w-[105px] rounded-md border border-slate-300 bg-white px-3 text-[0.85rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+                <input type="number" id="ageFilter" placeholder="Age (months)" min="0"
+                    class="h-9 w-[120px] rounded-md border border-slate-300 bg-white px-3 text-[0.85rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
             </div>
             <!-- Reset -->
             <button type="button" id="btnResetFilters"
@@ -500,8 +497,7 @@ sort($uniqueBarangays);
     const sexFilter     = document.getElementById('sexFilter');
     const ipFilter      = document.getElementById('ipFilter');
     const barangayFilter= document.getElementById('barangayFilter');
-    const ageMinFilter  = document.getElementById('ageMinFilter');
-    const ageMaxFilter  = document.getElementById('ageMaxFilter');
+    const ageFilter     = document.getElementById('ageFilter');
     const rowCountEl    = document.getElementById('rowCount');
 
     const toastHost = document.getElementById('toastContainer');
@@ -516,8 +512,7 @@ sort($uniqueBarangays);
         sexFilter.value     = '';
         ipFilter.value      = '';
         barangayFilter.value= '';
-        ageMinFilter.value  = '';
-        ageMaxFilter.value  = '';
+        ageFilter.value     = '';
         applyFilters();
     });
 
@@ -526,8 +521,7 @@ sort($uniqueBarangays);
         const sex      = sexFilter.value;
         const ip       = ipFilter.value;
         const barangay = barangayFilter.value;
-        const ageMin   = ageMinFilter.value !== '' ? parseInt(ageMinFilter.value, 10) : null;
-        const ageMax   = ageMaxFilter.value !== '' ? parseInt(ageMaxFilter.value, 10) : null;
+        const ageVal   = ageFilter.value !== '' ? parseInt(ageFilter.value, 10) : null;
 
         const rows = document.querySelectorAll('#tableBody tr[data-name]');
         let visible = 0;
@@ -538,10 +532,9 @@ sort($uniqueBarangays);
             const matchIp       = !ip       || row.dataset.ip  === ip;
             const matchBarangay = !barangay || row.dataset.barangay === barangay;
             const rowAge        = row.dataset.age !== '' ? parseInt(row.dataset.age, 10) : null;
-            const matchAgeMin   = ageMin === null || (rowAge !== null && rowAge >= ageMin);
-            const matchAgeMax   = ageMax === null || (rowAge !== null && rowAge <= ageMax);
+            const matchAge      = ageVal === null || (rowAge !== null && rowAge === ageVal);
 
-            const show = matchSearch && matchSex && matchIp && matchBarangay && matchAgeMin && matchAgeMax;
+            const show = matchSearch && matchSex && matchIp && matchBarangay && matchAge;
             row.style.display = show ? '' : 'none';
             if (show) visible++;
         });
@@ -563,7 +556,7 @@ sort($uniqueBarangays);
         }
     }
 
-    [searchInput, sexFilter, ipFilter, barangayFilter, ageMinFilter, ageMaxFilter]
+    [searchInput, sexFilter, ipFilter, barangayFilter, ageFilter]
         .forEach(el => el.addEventListener('input', applyFilters));
 
     // Set initial count

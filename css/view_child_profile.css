@@ -175,27 +175,6 @@ body {
 .avatar {
     position: relative;
     flex-shrink: 0;
-}
-
-.avatar-letter {
-    width: 68px;
-    height: 68px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.18);
-    border: 2.5px solid rgba(255, 255, 255, 0.35);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font);
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: #fff;
-    display: flex;
-    /* inline-block doesn't have width/height; use flex on parent */
-}
-
-/* Override: avatar-letter is used as a span, so wrap it */
-.avatar {
     width: 68px;
     height: 68px;
     border-radius: 50%;
@@ -211,9 +190,11 @@ body {
 }
 
 .avatar-letter {
-    font-family: var(--font);
-    font-size: 1.8rem;
-    font-weight: 700;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    line-height: 1;
 }
 
 .avatar-sex-badge {
@@ -510,8 +491,8 @@ body {
 }
 
 .btn-eccd {
-    border: 1.5px solid #185FA5;
-    background: #185FA5;
+    border: 1.5px solid #16a34a;
+    background: #16a34a;
     color: #ffffff;
     font-family: var(--font);
     font-size: 0.78rem;
@@ -523,9 +504,9 @@ body {
 }
 
 .btn-eccd:hover {
-    background: #124a82;
-    border-color: #124a82;
-    box-shadow: 0 8px 18px rgba(24, 95, 165, 0.28);
+    background: #15803d;
+    border-color: #15803d;
+    box-shadow: 0 8px 18px rgba(22, 163, 74, 0.28);
     transform: translateY(-1px);
 }
 
@@ -1010,9 +991,10 @@ td:last-child {
         gap: 10px;
     }
 
-    .hero-photo {
+    .avatar {
         width: 60px;
         height: 60px;
+        font-size: 1.6rem;
     }
 
     .chart-container {
@@ -1122,9 +1104,10 @@ td:last-child {
         font-size: 0.7rem;
     }
 
-    .hero-photo {
+    .avatar {
         width: 50px;
         height: 50px;
+        font-size: 1.4rem;
     }
 
     .hero-identity {

@@ -454,11 +454,11 @@ sort($barangayOptions);
         .btn-view {
             display:inline-flex; align-items:center; gap:3px;
             padding:6px 10px; font-size:11px; font-weight:700;
-            border-radius:6px; border:1px solid #2563eb;
-            background:#2563eb; color:#fff; text-decoration:none;
+            border-radius:6px; border:1px solid #059669 !important;
+            background:#059669 !important; color:#fff !important; text-decoration:none;
             white-space:nowrap;
         }
-        .btn-view:hover { background:#1d4ed8; }
+        .btn-view:hover { background:#047857 !important; }
         .btn-edit {
             display:inline-flex; align-items:center; gap:4px;
             padding:6px 10px; font-size:11px; font-weight:700;
@@ -639,16 +639,10 @@ sort($barangayOptions);
                         </select>
                     </div>
 
-                    <!-- Age Min -->
+                    <!-- Age (months) -->
                     <div>
-                        <div class="view-detail-label" style="margin-bottom:4px;">Min Age (months)</div>
-                        <input id="filterAgeMin" class="field-input" type="number" min="0" placeholder="Any age" style="width:110px;">
-                    </div>
-
-                    <!-- Age Max -->
-                    <div>
-                        <div class="view-detail-label" style="margin-bottom:4px;">Max Age (months)</div>
-                        <input id="filterAgeMax" class="field-input" type="number" min="0" placeholder="Any age" style="width:110px;">
+                        <div class="view-detail-label" style="margin-bottom:4px;">Age (months)</div>
+                        <input id="filterAge" class="field-input" type="number" min="0" placeholder="Any age" style="width:110px;">
                     </div>
 
                     <!-- Reset button -->
@@ -798,7 +792,7 @@ sort($barangayOptions);
                                             </div>
                                         </td>
                                         <td class="metric-cell">
-                                            <button type="button" class="btn-view btn-view-history" data-child-id="<?= (int)$child['child_id'] ?>" data-child-name="<?= htmlspecialchars($child['name']) ?>">
+                                            <button type="button" class="btn-view btn-view-history" data-child-id="<?= (int)$child['child_id'] ?>" data-child-name="<?= htmlspecialchars($child['name']) ?>" style="background:#059669 !important; border-color:#059669 !important; box-shadow:0 4px 12px rgba(5,150,105,.22) !important; color:#fff !important;">
                                                 <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                                                 View
                                             </button>
@@ -902,7 +896,7 @@ sort($barangayOptions);
         </div>
         <div class="modal-actions">
             <button type="button" class="btn-secondary" id="btnCloseConfirm">Cancel</button>
-            <button type="button" class="btn-view inline-flex items-center gap-1.5" id="btnConfirmGo" style="width:auto !important; margin-top:0 !important; padding:8px 12px !important; font-size:12px !important; border-radius:8px !important;">
+            <button type="button" class="btn-view inline-flex items-center gap-1.5" id="btnConfirmGo" style="width:auto !important; margin-top:0 !important; padding:8px 12px !important; font-size:12px !important; border-radius:8px !important; background:#059669 !important; border-color:#059669 !important; box-shadow:0 4px 12px rgba(5,150,105,.22) !important; color:#fff !important;">
                 <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                 Yes, view profile
             </button>

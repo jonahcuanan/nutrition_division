@@ -319,14 +319,14 @@ body {
 }
 
 .tbl-btn-view {
-    background: var(--green);
+    background: #059669;
     color: #fff;
-    border-color: var(--green);
+    border-color: #059669;
 }
 
 .tbl-btn-view:hover {
-    background: var(--green-dark);
-    border-color: var(--green-dark);
+    background: #047857;
+    border-color: #047857;
     transform: translateY(-1px);
 }
 

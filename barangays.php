@@ -336,7 +336,7 @@ $totalBarangays = $countResult ? $countResult->fetch_assoc()['total'] : 0;
                     </span>
                 </div>
             </div>
-            <button class="btn-add" type="button" onclick="openBarangayModal()">
+            <button class="btn-add" type="button" onclick="openBarangayModal()" style="background:#2563eb !important; box-shadow:0 4px 12px rgba(37,99,235,.28) !important;">
                 <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.8" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add Barangay
             </button>

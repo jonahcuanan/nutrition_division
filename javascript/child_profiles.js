@@ -51,8 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sexFilter = document.getElementById('sexFilter');
     const ipFilter = document.getElementById('ipFilter');
     const barangayFilter = document.getElementById('barangayFilter');
-    const ageMinFilter = document.getElementById('ageMinFilter');
-    const ageMaxFilter = document.getElementById('ageMaxFilter');
+    const ageFilter = document.getElementById('ageFilter');
     const hfaFilter = document.getElementById('hfaFilter');
     const wfaFilter = document.getElementById('wfaFilter');
     const wflhFilter = document.getElementById('wflhFilter');
@@ -777,8 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sex = (sexFilter?.value || '').toLowerCase();
         const ip = (ipFilter?.value || '').toLowerCase();
         const barangay = (barangayFilter?.value || '').toLowerCase();
-        const ageMin = (ageMinFilter?.value) ? parseInt(ageMinFilter.value) : null;
-        const ageMax = (ageMaxFilter?.value) ? parseInt(ageMaxFilter.value) : null;
+        const ageVal = (ageFilter?.value) ? parseInt(ageFilter.value) : null;
         const hfa = (hfaFilter?.value || '').toLowerCase();
         const wfa = (wfaFilter?.value || '').toLowerCase();
         const wflh = (wflhFilter?.value || '').toLowerCase();
@@ -790,7 +788,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         screenRows.forEach(row => {
             if (row.id === 'screenNoDataRow') return;
-            const matches = checkRowMatches(row, query, sex, ip, barangay, ageMin, ageMax, hfa, wfa, wflh, muac);
+            const matches = checkRowMatches(row, query, sex, ip, barangay, ageVal, hfa, wfa, wflh, muac);
             if (matches) {
                 row.style.display = '';
                 screenCount++;
@@ -806,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         printRows.forEach(row => {
             if (row.id === 'printNoDataRow') return;
-            const matches = checkRowMatches(row, query, sex, ip, barangay, ageMin, ageMax, hfa, wfa, wflh, muac);
+            const matches = checkRowMatches(row, query, sex, ip, barangay, ageVal, hfa, wfa, wflh, muac);
             if (matches) {
                 row.style.display = '';
                 const seqCell = row.querySelector('.print-center');
@@ -845,7 +843,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function checkRowMatches(row, query, sex, ip, barangay, ageMin, ageMax, hfa, wfa, wflh, muac) {
+    function checkRowMatches(row, query, sex, ip, barangay, ageVal, hfa, wfa, wflh, muac) {
         const rowName = (row.getAttribute('data-name') || '').toLowerCase();
         const rowSex = (row.getAttribute('data-sex') || '').toLowerCase();
         const rowIp = (row.getAttribute('data-ip') || '').toLowerCase();
@@ -861,20 +859,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const matchesSex = !sex || rowSex === sex || (sex === 'm' && rowSex === 'male') || (sex === 'f' && rowSex === 'female');
         const matchesIp = !ip || rowIp === ip;
         const matchesBarangay = !barangay || rowBarangay === barangay;
-        const matchesAgeMin = ageMin === null || (rowAge !== null && rowAge >= ageMin);
-        const matchesAgeMax = ageMax === null || (rowAge !== null && rowAge <= ageMax);
+        const matchesAge = ageVal === null || (rowAge !== null && rowAge === ageVal);
         const matchesHfa = !hfa || rowHfa === hfa;
         const matchesWfa = !wfa || rowWfa === wfa;
         const matchesWflh = !wflh || rowWflh === wflh;
         const matchesMuac = !muac || rowMuac === muac;
 
-        return matchesQuery && matchesSex && matchesIp && matchesBarangay && matchesAgeMin && matchesAgeMax && matchesHfa && matchesWfa && matchesWflh && matchesMuac;
+        return matchesQuery && matchesSex && matchesIp && matchesBarangay && matchesAge && matchesHfa && matchesWfa && matchesWflh && matchesMuac;
     }
 
+    // Debounce helper
+    function debounce(func, wait) {
+        let timeout;
+        return function (...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
+    const debouncedFilter = debounce(filterRows, 150);
+
     // Filter Event Listeners
-    [searchInput, sexFilter, ipFilter, barangayFilter, ageMinFilter, ageMaxFilter, hfaFilter, wfaFilter, wflhFilter, muacFilter].forEach(el => {
-        if (el) el.addEventListener('input', filterRows);
-        if (el && (el.tagName === 'SELECT')) el.addEventListener('change', filterRows);
+    [searchInput, ageFilter].forEach(el => {
+        if (el) el.addEventListener('input', debouncedFilter);
+    });
+
+    [sexFilter, ipFilter, hfaFilter, wfaFilter, wflhFilter, muacFilter, barangayFilter].forEach(el => {
+        if (el) {
+            el.addEventListener('input', filterRows);
+            if (el.tagName === 'SELECT') {
+                el.addEventListener('change', filterRows);
+            }
+        }
     });
 
     // Toggle Advanced Filters
@@ -896,7 +912,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reset Filters
     if (btnResetFilters) {
         btnResetFilters.addEventListener('click', () => {
-            [searchInput, sexFilter, ipFilter, barangayFilter, ageMinFilter, ageMaxFilter, hfaFilter, wfaFilter, wflhFilter, muacFilter].forEach(el => {
+            [searchInput, sexFilter, ipFilter, barangayFilter, ageFilter, hfaFilter, wfaFilter, wflhFilter, muacFilter].forEach(el => {
                 if (el) el.value = '';
             });
             filterRows();
@@ -919,8 +935,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const paramIp = urlParams.get('ip');
         const paramBarangayId = urlParams.get('barangay_id');
         const paramBarangayName = urlParams.get('barangay_name') || urlParams.get('barangay');
-        const paramAgeMin = urlParams.get('age_min') || urlParams.get('age_min_months');
-        const paramAgeMax = urlParams.get('age_max') || urlParams.get('age_max_months');
+        const paramAge = urlParams.get('age') || urlParams.get('age_months');
         const paramHfa = urlParams.get('hfa');
         const paramWfa = urlParams.get('wfa');
         const paramWflh = urlParams.get('wflh');
@@ -948,8 +963,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (paramAgeMin && ageMinFilter) { ageMinFilter.value = paramAgeMin; hasActiveFilters = true; }
-        if (paramAgeMax && ageMaxFilter) { ageMaxFilter.value = paramAgeMax; hasActiveFilters = true; }
+        if (paramAge && ageFilter) { ageFilter.value = paramAge; hasActiveFilters = true; }
         if (paramHfa && hfaFilter) { hfaFilter.value = paramHfa.toLowerCase(); hasActiveFilters = true; }
         if (paramWfa && wfaFilter) { wfaFilter.value = paramWfa.toLowerCase(); hasActiveFilters = true; }
         if (paramWflh && wflhFilter) { wflhFilter.value = paramWflh.toLowerCase(); hasActiveFilters = true; }
@@ -957,7 +971,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (hasActiveFilters) {
             // Expand the advanced filters panel if any advanced filters are active
-            if (advancedFiltersPanel && (paramAgeMin || paramAgeMax || paramHfa || paramWfa || paramWflh || (barangayFilter && barangayFilter.value))) {
+            if (advancedFiltersPanel && (paramAge || paramHfa || paramWfa || paramWflh || (barangayFilter && barangayFilter.value))) {
                 advancedFiltersPanel.classList.remove('hidden');
                 advancedFiltersPanel.classList.add('flex');
                 if (iconToggleFilters) iconToggleFilters.style.transform = 'rotate(180deg)';

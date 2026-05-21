@@ -562,7 +562,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
             </div>
         </div>
         <?php if ($isAdmin && !$isLogsTab): ?>
-            <button type="button" class="btn btn-primary" onclick="openModal()">
+            <button type="button" class="btn btn-blue" onclick="openModal()">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Create New Users 
             </button>
@@ -842,7 +842,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                 <td class="ua-contact"><?= $contactNumber !== '' ? htmlspecialchars($contactNumber) : '<span class="ua-dash">&mdash;</span>' ?></td>
                                 <td class="ua-email"><?= $email !== '' ? htmlspecialchars($email) : '<span class="ua-dash">&mdash;</span>' ?></td>
                                 <td>
-                                    <button class="btn btn-outline btn-compact" onclick="openEditUserModal({
+                                    <button class="btn btn-edit-user" onclick="openEditUserModal({
                                         user_id: <?= (int)$row['user_id'] ?>,
                                         first_name: <?= htmlspecialchars(json_encode($row['first_name'] ?? '')) ?>,
                                         middle_name: <?= htmlspecialchars(json_encode($row['middle_name'] ?? '')) ?>,
@@ -1172,7 +1172,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
 
         <div class="modal-footer">
             <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
-            <button type="submit" form="createUserForm" class="btn btn-primary" id="submitBtn">
+            <button type="submit" form="createUserForm" class="btn btn-blue" id="submitBtn">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
                 Create User
             </button>

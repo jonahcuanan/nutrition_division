@@ -699,7 +699,7 @@ if ($stmtCat) {
             <p>Track supplies, monitor stock levels, and record distributions to children</p>
         </div>
         <div class="page-header-actions">
-            <button type="button" class="btn btn-outline open-category-modal">
+            <button type="button" class="btn btn-blue open-category-modal">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add Category
             </button>
@@ -823,7 +823,7 @@ if ($stmtCat) {
                     <p>Manage categories before adding new items</p>
                 </div>
             </div>
-            <button type="button" class="btn btn-green" id="openAddModalBtn">
+            <button type="button" class="btn btn-blue" id="openAddModalBtn">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add New Item
             </button>
@@ -845,7 +845,7 @@ if ($stmtCat) {
                     <td data-label="Items" class="qty-cell"><span class="badge badge-blue"><?= (int)$cat['item_count'] ?></span></td>
                     <td data-label="View" class="qty-cell">
                         <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
-                            <a class="btn btn-outline btn-view" href="inventory_items.php?category_id=<?= (int)$cat['category_id'] ?>">
+                            <a class="btn btn-outline btn-view" href="inventory_items.php?category_id=<?= (int)$cat['category_id'] ?>" style="background:#059669 !important; border-color:#059669 !important; box-shadow:0 4px 12px rgba(5,150,105,.22) !important; color:#fff !important;">
                                 <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                                 View
                             </a>
@@ -871,7 +871,7 @@ if ($stmtCat) {
                     <td data-label="Category" style="font-weight:600;color:#111827;">Uncategorized</td>
                     <td data-label="Items" class="qty-cell"><span class="badge badge-gray"><?= $uncategorizedCount ?></span></td>
                     <td data-label="View" class="qty-cell">
-                        <a class="btn btn-outline btn-view" href="inventory_items.php?category=uncategorized">
+                        <a class="btn btn-outline btn-view" href="inventory_items.php?category=uncategorized" style="background:#059669 !important; border-color:#059669 !important; box-shadow:0 4px 12px rgba(5,150,105,.22) !important; color:#fff !important;">
                             <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                             View
                         </a>
@@ -1067,7 +1067,7 @@ if ($stmtCat) {
                 </div>
                 <div class="modal-foot">
                     <button type="button" class="btn btn-outline" id="addModalCancel">Cancel</button>
-                    <button type="submit" class="btn btn-green">
+                    <button type="submit" class="btn btn-blue">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                         Save Item
                     </button>
@@ -1119,7 +1119,7 @@ if ($stmtCat) {
                 </div>
                 <div class="modal-foot">
                     <button type="button" class="btn btn-outline" id="categoryModalCancel">Cancel</button>
-                    <button type="submit" class="btn btn-green">Save Category</button>
+                    <button type="submit" class="btn btn-blue">Save Category</button>
                 </div>
             </form>
         </div>

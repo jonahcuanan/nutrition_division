@@ -405,7 +405,7 @@ if ($getMonthFrom > 0 || $getYear > 0) {
 }
 
 $baseSql .= " WHERE " . implode(" AND ", $whereClauses);
-$baseSql .= " ORDER BY c.status_date DESC";
+$baseSql .= " ORDER BY b.barangay_name ASC, c.last_name ASC, c.first_name ASC";
 
 $stmtList = $conn->prepare($baseSql);
 if ($stmtList) {
@@ -606,7 +606,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
     <div id="toastContainer"></div>
 
     <!-- Page Header -->
-    <div class="no-print flex items-center gap-3 mb-5 justify-between">
+    <div class="no-print flex flex-col gap-3 mb-5 justify-between md:flex-row md:items-center">
         <div class="flex items-center gap-3">
             <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-lg">👶</div>
             <div>
@@ -614,7 +614,11 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 <p class="mt-0.5 text-xs text-slate-500">View and manage all registered children</p>
             </div>
         </div>
-        <div>
+        <div class="flex items-center gap-2 w-full md:w-auto md:min-w-[515px] lg:min-w-[615px]">
+            <div class="relative flex-1 min-w-[315px]">
+                <svg class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="searchInput" placeholder="Search name, address, barangay, caregiver…" class="w-full rounded-md border border-slate-300 bg-white py-2 pl-7 pr-3 text-[0.8rem] text-slate-900 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+            </div>
             <span id="rowCount" class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-3 py-1.5 text-[0.72rem] font-bold text-emerald-800 shadow-sm whitespace-nowrap">
                 <span id="rowCountNumber" class="inline-flex min-w-7 items-center justify-center rounded-full bg-emerald-600 px-2 py-0.5 text-[0.72rem] font-extrabold leading-none text-white"><?= (int)$totalChildren ?></span>
                 <span class="uppercase tracking-[0.12em]">records</span>
@@ -627,10 +631,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
     <!-- Toolbar -->
     <div class="no-print mb-4 flex flex-col gap-2.5 child-toolbar">
         <div class="flex flex-wrap items-center gap-2.5">
-            <div class="relative flex-1 min-w-[200px] max-w-xs">
-                <svg class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" id="searchInput" placeholder="Search name, address, barangay, caregiver…" class="w-full rounded-md border border-slate-300 bg-white py-2 pl-7 pr-3 text-[0.8rem] text-slate-900 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
-            </div>
+            <span class="text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-slate-500">Filter by:</span>
             <?php if ($isAdmin): ?>
             <select id="barangayFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
                 <option value="">All Barangays</option>
@@ -674,9 +675,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 </select>
 
                 <div class="flex items-center gap-2 col-span-2 sm:col-span-1 lg:w-auto">
-                    <input type="number" id="ageMinFilter" placeholder="Min Age (months)" class="h-9 w-1/2 lg:w-[110px] rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" min="0" />
-                    <span class="text-slate-400 text-xs font-medium">-</span>
-                    <input type="number" id="ageMaxFilter" placeholder="Max Age (months)" class="h-9 w-1/2 lg:w-[110px] rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" min="0" />
+                    <input type="number" id="ageFilter" placeholder="Age (months)" class="h-9 w-full lg:w-[130px] rounded-md border border-slate-300 bg-white px-3 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" min="0" />
                 </div>
 
                 <select id="hfaFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 w-full col-span-2 sm:col-span-1 lg:w-auto">
@@ -705,7 +704,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 </select>
 
                 <select id="muacFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.8rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 w-full col-span-2 sm:col-span-1 lg:w-auto">
-                    <option value="">MUAC Status</option>
+                    <option value="">MUAC</option>
                     <option value="normal">Normal</option>
                     <option value="moderately wasted">Moderately Wasted</option>
                     <option value="severely wasted">Severely Wasted</option>
@@ -959,6 +958,25 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
     <!-- Screen Table -->
     <div class="screen-only child-table-wrap overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
         <table class="table-stack min-w-full border border-slate-300 text-left text-[0.62rem] leading-tight">
+            <colgroup>
+                <col style="width:110px"><!-- Address -->
+                <?php if ($isAdmin): ?><col style="width:90px"><?php endif; ?><!-- Barangay -->
+                <col style="width:100px"><!-- Mother/Caregiver -->
+                <col style="width:120px"><!-- Full Name -->
+                <col style="width:55px"> <!-- IP Group -->
+                <col style="width:45px"> <!-- Sex -->
+                <col style="width:72px"> <!-- DOB -->
+                <col style="width:72px"> <!-- Date Measured -->
+                <col style="width:55px"> <!-- Weight -->
+                <col style="width:55px"> <!-- Height -->
+                <col style="width:58px"> <!-- Age -->
+                <col style="width:70px"> <!-- HFA -->
+                <col style="width:70px"> <!-- WFA -->
+                <col style="width:70px"> <!-- WFLH -->
+                <col style="width:55px"> <!-- MUAC cm -->
+                <col style="width:63px"> <!-- MUAC Status -->
+                <col style="width:60px"> <!-- Actions -->
+            </colgroup>
             <thead class="text-[0.58rem] font-semibold uppercase tracking-wide text-white">
                 <tr>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 align-middle">Address / Location</th>
@@ -1153,7 +1171,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                             <button type="button" class="action-menu-btn inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:border-blue-200 transition-colors shadow-sm" aria-label="Open actions" aria-expanded="false">
                                 <span class="text-lg font-bold">⋮</span>
                             </button>
-                            <div class="action-menu hidden absolute right-0 top-full z-10 mt-2 w-40 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
+                            <div class="action-menu hidden w-40 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
                                 <a class="flex items-center gap-2 rounded-md px-3 py-2 text-left text-[0.78rem] font-semibold text-emerald-700 hover:bg-emerald-50" href="view_child_profile.php?child_id=<?= (int)$row['child_id'] ?>">
                                     <svg class="shrink-0 opacity-90" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                                     View
@@ -1163,7 +1181,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                                     Update Measurement
                                 </button>
                                 <?php if ($currentAgeMonths !== null && $currentAgeMonths >= 6 && $currentAgeMonths <= 59): ?>
-                                <button type="button" class="btn-open-update flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[0.78rem] font-semibold text-emerald-700 hover:bg-emerald-50" data-child-id="<?= (int)$row['child_id'] ?>" data-mode="muac">
+                                <button type="button" class="btn-open-update flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[0.78rem] font-semibold text-blue-700 hover:bg-blue-50" data-child-id="<?= (int)$row['child_id'] ?>" data-mode="muac">
                                     <svg class="shrink-0 opacity-90" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     Update MUAC
                                 </button>

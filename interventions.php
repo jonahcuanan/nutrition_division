@@ -1231,11 +1231,11 @@ function child_label(array $child): string {
             </div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button class="btn-primary-green" id="btnOpenTypeModal">
+            <button class="btn-primary-green" id="btnOpenTypeModal" style="background:#2563eb !important; box-shadow:0 4px 12px rgba(37,99,235,.24) !important;">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
                 Add Type
             </button>
-            <button class="btn-primary-blue" id="btnOpenInterventionModal">
+            <button class="btn-primary-blue" id="btnOpenInterventionModal" style="background:#2563eb !important; box-shadow:0 4px 12px rgba(37,99,235,.24) !important;">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
                 Add Intervention
             </button>
@@ -1340,7 +1340,7 @@ function child_label(array $child): string {
                                     <?php $encodeKeyStr = $item['type_id'] . '::' . $item['description'] . '::' . $item['intervention_date']; ?>
                                     <a
                                         href="view_interventions.php?k=<?= urlencode(base64_encode($encodeKeyStr)) ?>"
-                                        class="tbl-btn-view btn-view-page">
+                                        class="tbl-btn-view btn-view-page" style="background:#059669 !important; border-color:#059669 !important; box-shadow:0 4px 12px rgba(5,150,105,.22) !important;">
                                         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                                         View
                                     </a>
@@ -1431,7 +1431,7 @@ function child_label(array $child): string {
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-ghost btn-close" data-target="typeModal">Cancel</button>
-                <button type="submit" class="btn-primary-green" id="saveTypeBtn">Save Type</button>
+                <button type="submit" class="btn-primary-green" id="saveTypeBtn" style="background:#2563eb !important; box-shadow:0 4px 12px rgba(37,99,235,.24) !important;">Save Type</button>
             </div>
         </form>
     </div>
@@ -1659,7 +1659,7 @@ function child_label(array $child): string {
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-ghost btn-close" data-target="interventionModal">Cancel</button>
-                <button type="submit" class="btn-primary-blue">
+                <button type="submit" class="btn-primary-blue" style="background:#2563eb !important; box-shadow:0 4px 12px rgba(37,99,235,.24) !important;">
                     <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
                     Save Intervention
                 </button>

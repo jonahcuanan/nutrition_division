@@ -22,6 +22,7 @@
     let countdownInterval = null;
     let warningVisible = false;
     let secondsLeft = 0;
+    let lastResetTime = 0;
 
     /* ── Helper: POST logout ────── */
     function sendLogout(reason) {
@@ -48,8 +49,12 @@
         countdownInterval = null;
     }
 
-    function resetInactivityTimer() {
+    function resetInactivityTimer(force = false) {
         if (warningVisible) return;   // don't reset while warning is shown
+        const now = Date.now();
+        if (!force && now - lastResetTime < 5000) return; // Only reset at most once every 5 seconds
+        lastResetTime = now;
+
         clearTimers();
         inactivityTimer = setTimeout(showWarning, TIMEOUT_MS - WARN_BEFORE_MS);
     }
@@ -156,7 +161,7 @@
         document.body.style.overflow = '';
         if (countdownInterval) clearInterval(countdownInterval);
         countdownInterval = null;
-        resetInactivityTimer();
+        resetInactivityTimer(true);
     }
 
     /* ── Activity event listeners ─────────────────────────────────── */
