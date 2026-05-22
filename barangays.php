@@ -195,24 +195,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if ($errorMessage === '') {
         $isUpdate = ctype_digit($formData['barangay_id']) && (int)$formData['barangay_id'] > 0;
-        if (!$isUpdate) {
-            $nameKey = normalize_barangay_key($formData['barangay_name']);
-            if ($nameKey !== '') {
-                $dupSql = "SELECT 1 FROM barangays
-                           WHERE REPLACE(REPLACE(REPLACE(UPPER(barangay_name), ' ', ''), '\t', ''), '\n', '') = ?
-                           LIMIT 1";
-                $dupStmt = $conn->prepare($dupSql);
-                if ($dupStmt) {
-                    $dupStmt->bind_param('s', $nameKey);
-                    $dupStmt->execute();
-                    $dupStmt->store_result();
-                    if ($dupStmt->num_rows > 0) {
-                        $errorMessage = 'Barangay name already exists. Please use a unique name.';
-                    }
-                    $dupStmt->close();
+        // Validate barangay name uniqueness for both add and update operations
+        $nameKey = normalize_barangay_key($formData['barangay_name']);
+        if ($nameKey !== '') {
+            $dupSql = $isUpdate
+                ? "SELECT 1 FROM barangays WHERE REPLACE(REPLACE(REPLACE(UPPER(barangay_name), ' ', ''), '\\t', ''), '\\n', '') = ? AND barangay_id != ? LIMIT 1"
+                : "SELECT 1 FROM barangays WHERE REPLACE(REPLACE(REPLACE(UPPER(barangay_name), ' ', ''), '\\t', ''), '\\n', '') = ? LIMIT 1";
+            $dupStmt = $conn->prepare($dupSql);
+            if ($dupStmt) {
+                if ($isUpdate) {
+                    $dupStmt->bind_param('si', $nameKey, $formData['barangay_id']);
                 } else {
-                    $errorMessage = 'Database error while validating barangay name.';
+                    $dupStmt->bind_param('s', $nameKey);
                 }
+                $dupStmt->execute();
+                $dupStmt->store_result();
+                if ($dupStmt->num_rows > 0) {
+                    $errorMessage = 'Barangay name already exists. Please use a unique name.';
+                }
+                $dupStmt->close();
+            } else {
+                $errorMessage = 'Database error while validating barangay name.';
             }
         }
 

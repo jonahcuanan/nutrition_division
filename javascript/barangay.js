@@ -91,8 +91,7 @@ window.startEditBarangay = function (e, btn) {
     form.elements['psgc'].value = btn.dataset.psgc || '';
     idInput.value = btn.dataset.id || '';
 
-    // Lock core location fields during edit
-    form.elements['barangay_name'].readOnly = true;
+    // Lock non-name core location fields during edit; allow barangay name to be edited
     form.elements['city'].readOnly = true;
     form.elements['province'].readOnly = true;
     form.elements['psgc'].readOnly = true;
@@ -393,7 +392,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const form = modal.querySelector('form');
         if (form) {
-            form.elements['barangay_name'].readOnly = true;
+            // Keep location and PSGC locked but allow editing the barangay name when returning to the modal
+            form.elements['barangay_name'].readOnly = false;
             form.elements['city'].readOnly = true;
             form.elements['province'].readOnly = true;
             form.elements['psgc'].readOnly = true;
@@ -456,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const value = input.value.trim();
             const idValue = idInput ? idInput.value : '';
 
-            if (field === 'barangay_name' && idValue) return;
+            // allow name duplicate checks even during edit (exclude current id on server)
 
             if (value === '') {
                 input.setCustomValidity('');

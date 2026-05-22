@@ -6,8 +6,14 @@
     const distModal = document.getElementById('distributeModal');
     const categoryModal = document.getElementById('categoryModal');
     const restockModal = document.getElementById('restockModal');
+    const editModal = document.getElementById('editItemModal');
+    const deleteItemModal = document.getElementById('deleteItemModal');
     const deleteCategoryModal = document.getElementById('deleteCategoryModal');
+    const editItemNameText = document.getElementById('editItemName');
+    const editCurrentExpirationText = document.getElementById('editCurrentExpiration');
+    const deleteItemNameText = document.getElementById('deleteItemNameText');
     const deleteCategoryNameText = document.getElementById('deleteCategoryNameText');
+    let pendingDeleteItemForm = null;
     let pendingDeleteCategoryForm = null;
 
     const openAddBtn = document.getElementById('openAddModalBtn');
@@ -48,6 +54,46 @@
 
                 openModal(restockModal);
             });
+        });
+    }
+
+    if (editModal) {
+        document.addEventListener('click', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+
+            const editTrigger = target.closest('.js-open-edit-item-modal');
+            if (editTrigger instanceof HTMLElement) {
+                const itemId = editTrigger.dataset.itemId || '';
+                const itemName = editTrigger.dataset.itemName || 'Selected item';
+                const itemExpiration = editTrigger.dataset.itemExpiration || '';
+                const itemExpirationDisplay = editTrigger.dataset.itemExpirationDisplay || '—';
+
+                const itemIdInput = document.getElementById('editItemId');
+                const expirationInput = document.getElementById('editExpirationDate');
+                if (itemIdInput) itemIdInput.value = itemId;
+                if (expirationInput) expirationInput.value = itemExpiration;
+                if (editItemNameText) editItemNameText.textContent = itemName;
+                if (editCurrentExpirationText) editCurrentExpirationText.textContent = itemExpirationDisplay;
+
+                openModal(editModal);
+                return;
+            }
+
+            const deleteTrigger = target.closest('.js-open-delete-item-modal');
+            if (deleteTrigger instanceof HTMLElement) {
+                if (deleteTrigger.hasAttribute('disabled')) return;
+
+                const form = deleteTrigger.closest('form.js-delete-item-form');
+                if (!(form instanceof HTMLFormElement)) return;
+
+                pendingDeleteItemForm = form;
+                const itemName = deleteTrigger.getAttribute('data-item-name') || 'this item';
+                if (deleteItemNameText) {
+                    deleteItemNameText.textContent = 'Item: ' + itemName;
+                }
+                openModal(deleteItemModal);
+            }
         });
     }
 
@@ -108,6 +154,49 @@
     const restockBackdrop = document.getElementById('restockBackdrop');
     if (restockBackdrop && restockModal) restockBackdrop.addEventListener('click', () => closeModal(restockModal));
 
+    const editModalClose = document.getElementById('editModalClose');
+    if (editModalClose && editModal) editModalClose.addEventListener('click', () => closeModal(editModal));
+    const editModalCancel = document.getElementById('editModalCancel');
+    if (editModalCancel && editModal) editModalCancel.addEventListener('click', () => closeModal(editModal));
+    const editBackdrop = document.getElementById('editBackdrop');
+    if (editBackdrop && editModal) editBackdrop.addEventListener('click', () => closeModal(editModal));
+
+    const deleteItemClose = document.getElementById('deleteItemClose');
+    if (deleteItemClose && deleteItemModal) {
+        deleteItemClose.addEventListener('click', () => {
+            closeModal(deleteItemModal);
+            pendingDeleteItemForm = null;
+        });
+    }
+    const deleteItemCancel = document.getElementById('deleteItemCancel');
+    if (deleteItemCancel && deleteItemModal) {
+        deleteItemCancel.addEventListener('click', () => {
+            closeModal(deleteItemModal);
+            pendingDeleteItemForm = null;
+        });
+    }
+    const deleteItemBackdrop = document.getElementById('deleteItemBackdrop');
+    if (deleteItemBackdrop && deleteItemModal) {
+        deleteItemBackdrop.addEventListener('click', () => {
+            closeModal(deleteItemModal);
+            pendingDeleteItemForm = null;
+        });
+    }
+    const deleteItemConfirmBtn = document.getElementById('deleteItemConfirmBtn');
+    if (deleteItemConfirmBtn) {
+        deleteItemConfirmBtn.addEventListener('click', () => {
+            if (!pendingDeleteItemForm) return;
+            const formToSubmit = pendingDeleteItemForm;
+            pendingDeleteItemForm = null;
+            closeModal(deleteItemModal);
+            if (typeof formToSubmit.requestSubmit === 'function') {
+                formToSubmit.requestSubmit();
+            } else {
+                formToSubmit.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+        });
+    }
+
     const distModalClose = document.getElementById('distModalClose');
     if (distModalClose && distModal) distModalClose.addEventListener('click', () => { closeModal(distModal); clearCart(); });
     const distModalCancel = document.getElementById('distModalCancel');
@@ -121,7 +210,10 @@
         if (categoryModal) closeModal(categoryModal);
         if (distModal) closeModal(distModal);
         if (restockModal) closeModal(restockModal);
+        if (editModal) closeModal(editModal);
+        if (deleteItemModal) closeModal(deleteItemModal);
         if (deleteCategoryModal) closeModal(deleteCategoryModal);
+        pendingDeleteItemForm = null;
         pendingDeleteCategoryForm = null;
         clearCart();
     });
@@ -325,11 +417,26 @@
     const openCategoryModal = document.body.dataset.openCategoryModal === '1';
     const openDistributeModal = document.body.dataset.openDistributeModal === '1';
     const openRestockModal = document.body.dataset.openRestockModal === '1';
+    const openEditModal = document.body.dataset.openEditModal === '1';
 
     if (openAddModal && addModal) openModal(addModal);
     if (openCategoryModal && categoryModal) openModal(categoryModal);
     if (openDistributeModal && distModal) openModal(distModal);
     if (openRestockModal && restockModal) openModal(restockModal);
+    if (openEditModal && editModal) {
+        const itemName = editModal.dataset.itemName || 'Selected item';
+        const itemExpiration = editModal.dataset.itemExpiration || '';
+        const itemExpirationDisplay = editModal.dataset.itemExpirationDisplay || '—';
+        const itemNameInput = document.getElementById('editItemId');
+        const expirationInput = document.getElementById('editExpirationDate');
+        if (editItemNameText) editItemNameText.textContent = itemName;
+        if (editCurrentExpirationText) editCurrentExpirationText.textContent = itemExpirationDisplay;
+        if (expirationInput) expirationInput.value = itemExpiration;
+        if (itemNameInput && !itemNameInput.value) {
+            itemNameInput.value = editModal.dataset.itemId || '';
+        }
+        openModal(editModal);
+    }
 
     // ── Search + filters ──
     const invSearch = document.getElementById('invSearch');
@@ -337,15 +444,18 @@
     const stockFilter = document.getElementById('stockFilter');
     const expirationFilter = document.getElementById('expirationFilter');
     const availabilityFilter = document.getElementById('availabilityFilter');
+    const itemStatusFilter = document.getElementById('itemStatusFilter');
     const invRows = document.querySelectorAll('#invBody tr[data-search]');
     const invCount = document.getElementById('invCount');
 
     function applyFilters() {
+        if (!invSearch || !stockFilter || !invCount) return;
         const q = invSearch.value.toLowerCase().trim();
         const cat = categoryFilter ? categoryFilter.value : '';
         const stk = stockFilter.value;
         const exp = expirationFilter ? expirationFilter.value : '';
         const avl = availabilityFilter ? availabilityFilter.value : '';
+        const itemStatus = itemStatusFilter ? itemStatusFilter.value : '';
         let v = 0;
 
         invRows.forEach(row => {
@@ -353,7 +463,8 @@
                 && (!cat || row.dataset.category === cat)
                 && (!stk || row.dataset.stock === stk)
                 && (!exp || row.dataset.expiration === exp)
-                && (!avl || row.dataset.availability === avl);
+                && (!avl || row.dataset.availability === avl)
+                && (!itemStatus || row.dataset.itemStatus === itemStatus);
             row.style.display = show ? '' : 'none';
             if (show) v++;
         });
@@ -366,7 +477,32 @@
         stockFilter.addEventListener('change', applyFilters);
         if (expirationFilter) expirationFilter.addEventListener('change', applyFilters);
         if (availabilityFilter) availabilityFilter.addEventListener('change', applyFilters);
+        if (itemStatusFilter) itemStatusFilter.addEventListener('change', applyFilters);
     }
+
+    document.addEventListener('submit', (e) => {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+
+        if (form.classList.contains('js-remove-expired-form')) {
+            const btn = form.querySelector('.btn-remove-expired');
+            const name = btn && btn.dataset.itemName ? btn.dataset.itemName : 'this item';
+            if (!window.confirm('Remove "' + name + '" from inventory? This cannot be undone.')) {
+                e.preventDefault();
+            }
+            return;
+        }
+
+        if (form.classList.contains('js-zero-expired-form')) {
+            const btn = form.querySelector('.btn-zero-expired-stock');
+            const name = btn && btn.dataset.itemName ? btn.dataset.itemName : 'this item';
+            if (!window.confirm(
+                'Set stock for "' + name + '" to zero?\n\nThe item stays in the system for past intervention records, but it will no longer appear for new give-outs.'
+            )) {
+                e.preventDefault();
+            }
+        }
+    });
 
     // ── Distribution month filter ──
     const distMonthSelect = document.getElementById('distMonthFilter');
@@ -417,6 +553,25 @@
     if (distItemSelect) distItemSelect.addEventListener('change', applyDistFilters);
     if (distSearch) distSearch.addEventListener('input', applyDistFilters);
     if (distMonthSelect || distBarangaySelect || distYearSelect || distItemSelect || distSearch) applyDistFilters();
+
+    // Expose a function to refresh distribution history via AJAX and reapply filters
+    window.refreshDistHistory = function () {
+        fetch('inventory.php?action=dist_rows_ajax', { credentials: 'same-origin' })
+            .then(res => res.json())
+            .then(json => {
+                if (json && json.success && typeof json.html === 'string') {
+                    const tbody = document.getElementById('distBody');
+                    if (tbody) {
+                        tbody.innerHTML = json.html;
+                        // Reapply filters to the newly injected rows
+                        if (typeof applyDistFilters === 'function') applyDistFilters();
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('[refreshDistHistory]', err);
+            });
+    };
 
     // ── AJAX Form Submission ──
     document.addEventListener('submit', async (e) => {

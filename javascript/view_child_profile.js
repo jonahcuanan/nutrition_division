@@ -58,6 +58,17 @@ document.addEventListener('DOMContentLoaded', function () {
         .filter(r => r.height !== null && r.weight !== null)
         .map(r => ({ x: Number(r.height), y: Number(r.weight), status: r.weight_for_ltht_status }));
 
+    const chartGrid = {
+        display: true,
+        drawOnChartArea: true,
+        color: 'rgba(148, 163, 184, 0.45)',
+        lineWidth: 0.85,
+        drawBorder: true,
+        borderColor: '#1f2937',
+        tickLength: 6,
+        tickColor: '#1f2937'
+    };
+
     const baseOpts = {
         responsive: true,
         maintainAspectRatio: false,
@@ -75,13 +86,13 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         scales: {
             x: {
-                grid: { color: '#d1d5db', drawBorder: true, lineWidth: 0.6, drawTicks: true },
-                border: { color: '#1f2937' },
+                grid: { ...chartGrid },
+                border: { color: '#1f2937', width: 1.5 },
                 ticks: { color: '#111827', font: { size: chartTickFontSize, family: 'Arial' }, autoSkip: false }
             },
             y: {
-                grid: { color: '#d1d5db', drawBorder: true },
-                border: { color: '#1f2937' },
+                grid: { ...chartGrid },
+                border: { color: '#1f2937', width: 1.5 },
                 ticks: { color: '#111827', font: { size: chartTickFontSize, family: 'Arial' } },
                 beginAtZero: false
             }
@@ -97,12 +108,42 @@ document.addEventListener('DOMContentLoaded', function () {
         xMax = null,
         xStep = null,
         xTickCallback = null,
+        xGridStep = null,
+        xLabelStep = null,
         yMin = null,
         yMax = null,
         yStep = null,
         yTickCallback = null,
-        yAutoSkip = null
+        yAutoSkip = null,
+        yGridStep = null,
+        yLabelStep = null
     ) => {
+        const xGridTickStep = xGridStep !== null ? xGridStep : xStep;
+        const xLabelTickStep = xLabelStep !== null ? xLabelStep : xStep;
+        const xLabelCallback = (xLabelStep !== null && xTickCallback === null)
+            ? (value) => {
+                const v = Number(value);
+                if (!Number.isFinite(v)) return '';
+                const step = xLabelTickStep;
+                if (step === null || step <= 1) return String(v);
+                if (xMin !== null && v === xMin) return String(v);
+                if (xMax !== null && v === xMax) return String(v);
+                return Math.round(v % step) === 0 ? String(v) : '';
+            }
+            : xTickCallback;
+        const yGridTickStep = yGridStep !== null ? yGridStep : yStep;
+        const yLabelTickStep = yLabelStep !== null ? yLabelStep : yStep;
+        const yLabelCallback = (yLabelStep !== null && yTickCallback === null)
+            ? (value) => {
+                const v = Number(value);
+                if (!Number.isFinite(v)) return '';
+                const step = yLabelTickStep;
+                if (step === null || step <= 1) return String(v);
+                if (yMin !== null && v === yMin) return String(v);
+                if (yMax !== null && v === yMax) return String(v);
+                return Math.round(v % step) === 0 ? String(v) : '';
+            }
+            : yTickCallback;
         const ctx = document.getElementById(id);
         if (!ctx) return;
 
@@ -176,31 +217,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 scales: {
                     x: {
                         type: 'linear',
-                        grid: { color: '#d1d5db', drawBorder: true, lineWidth: 0.6, drawTicks: true },
-                        border: { color: '#1f2937' },
+                        grid: { ...chartGrid },
+                        border: { color: '#1f2937', width: 1.5 },
                         min: xMin === null ? undefined : xMin,
                         max: xMax === null ? undefined : xMax,
                         ticks: {
                             color: '#111827',
                             font: { size: chartTickFontSize, family: 'Arial' },
-                            stepSize: xStep === null ? undefined : xStep,
+                            stepSize: xGridTickStep === null ? undefined : xGridTickStep,
                             autoSkip: false,
-                            callback: xTickCallback === null ? undefined : xTickCallback,
+                            callback: xLabelCallback === null ? undefined : xLabelCallback,
                             maxRotation: 0,
                             minRotation: 0
                         },
                         title: { display: true, text: xTitle, color: '#111827', font: { size: chartTitleFontSize, family: 'Arial', weight: '600' } }
                     },
                     y: {
-                        grid: { color: '#d1d5db', drawBorder: true },
-                        border: { color: '#1f2937' },
+                        grid: { ...chartGrid },
+                        border: { color: '#1f2937', width: 1.5 },
                         min: yMin === null ? undefined : yMin,
                         max: yMax === null ? undefined : yMax,
                         ticks: {
                             color: '#111827',
                             font: { size: chartTickFontSize, family: 'Arial' },
-                            stepSize: yStep === null ? undefined : yStep,
-                            callback: yTickCallback === null ? undefined : yTickCallback,
+                            stepSize: yGridTickStep === null ? undefined : yGridTickStep,
+                            callback: yLabelCallback === null ? undefined : yLabelCallback,
                             autoSkip: yAutoSkip === null ? undefined : yAutoSkip
                         },
                         title: { display: true, text: yTitle, color: '#111827', font: { size: chartTitleFontSize, family: 'Arial', weight: '600' } }
@@ -219,38 +260,119 @@ document.addEventListener('DOMContentLoaded', function () {
         return { x: Number(r[xKey]), y: (zeroAsNull && (!yVal || yVal <= 0)) ? null : yVal };
     });
 
+    const childAxisValues = (points, key) =>
+        points.map(p => Number(p[key])).filter(v => Number.isFinite(v));
+
+    /** Keep standard ECCD chart design; only widen an axis when a child point goes past it. */
+    const fitAxisToChild = (defaultMin, defaultMax, childValues) => {
+        const vals = childValues.filter(v => Number.isFinite(v));
+        if (!vals.length) {
+            return { min: defaultMin, max: defaultMax, expanded: false };
+        }
+        const childMin = Math.min(...vals);
+        const childMax = Math.max(...vals);
+        const below = childMin < defaultMin;
+        const above = childMax > defaultMax;
+        if (!below && !above) {
+            return { min: defaultMin, max: defaultMax, expanded: false };
+        }
+        const pad = Math.max((defaultMax - defaultMin) * 0.05, 0.5);
+        return {
+            min: below ? Math.floor(childMin - pad) : defaultMin,
+            max: above ? Math.ceil(childMax + pad) : defaultMax,
+            expanded: true
+        };
+    };
+
+    const expandedAxisStep = (min, max, defaultStep) => {
+        const range = max - min;
+        const rough = range / (isCompactViewport ? 8 : 12);
+        return Math.max(defaultStep, Math.ceil(rough));
+    };
+
     if (hasRecords && wfaRef.length) {
+        const wfaXDef = { min: 0, max: 59, step: isCompactViewport ? 6 : 1 };
+        const wfaYDef = { min: 1, max: 25, step: isCompactViewport ? 2 : 1 };
+        const wfaX = fitAxisToChild(wfaXDef.min, wfaXDef.max, childAxisValues(wfaChild, 'x'));
+        const wfaY = fitAxisToChild(wfaYDef.min, wfaYDef.max, childAxisValues(wfaChild, 'y'));
+        const wfaYLabelStep = wfaY.expanded
+            ? expandedAxisStep(wfaY.min, wfaY.max, wfaYDef.step)
+            : wfaYDef.step;
+
         makeEccdLineChart('wfaEccdChart', [
             { label: 'Severely Underweight', data: toPoints(wfaRef, 'age_month', 'severely_underweight_max'), borderColor: '#1e3a8a', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Underweight', data: toPoints(wfaRef, 'age_month', 'underweight_max'), borderColor: '#2563eb', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Normal (Upper)', data: toPoints(wfaRef, 'age_month', 'normal_max'), borderColor: '#38bdf8', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Overweight', data: toPoints(wfaRef, 'age_month', 'overweight', true), borderColor: '#0ea5e9', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Child', data: wfaChild, borderColor: childLineColor, backgroundColor: childLineColor, borderWidth: 2.4, pointRadius: 3, pointHoverRadius: 6, tension: 0.15 }
-        ], 'Age (months)', 'Weight (kg)', 0, 59, isCompactViewport ? 6 : 1, null, 1, 25, isCompactViewport ? 2 : 1);
+        ], 'Age (months)', 'Weight (kg)',
+            wfaX.min, wfaX.max, wfaX.expanded ? expandedAxisStep(wfaX.min, wfaX.max, wfaXDef.step) : wfaXDef.step,
+            null, null, null,
+            wfaY.min, wfaY.max, null, null, null, 1, wfaYLabelStep);
     }
 
     if (hasRecords && hfaRef.length) {
+        const hfaXDef = { min: 0, max: 59, step: isCompactViewport ? 6 : 1 };
+        const hfaYDef = { min: 43, max: 119, step: isCompactViewport ? 4 : 1 };
+        const hfaX = fitAxisToChild(hfaXDef.min, hfaXDef.max, childAxisValues(hfaChild, 'x'));
+        const hfaY = fitAxisToChild(hfaYDef.min, hfaYDef.max, childAxisValues(hfaChild, 'y'));
+        const hfaYGridStep = 1;
+        const hfaHeightLabelStep = (() => {
+            const range = hfaY.max - hfaY.min;
+            if (range > 100) return 10;
+            if (range > 60 || isCompactViewport) return 5;
+            return 2;
+        })();
+
+        const hfaYLabelCallback = (value) => {
+            const v = Number(value);
+            if (!Number.isFinite(v)) return '';
+            if (v === hfaY.min || v === hfaY.max) return String(v);
+            const start = Math.ceil(hfaY.min / hfaHeightLabelStep) * hfaHeightLabelStep;
+            if (v < start || v > hfaY.max) return '';
+            return v % hfaHeightLabelStep === 0 ? String(v) : '';
+        };
+
         makeEccdLineChart('hfaEccdChart', [
             { label: 'Severely Stunted', data: toPoints(hfaRef, 'age_month', 'severely_stunted'), borderColor: '#1e3a8a', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Stunted', data: toPoints(hfaRef, 'age_month', 'stunted_to'), borderColor: '#2563eb', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Normal (Upper)', data: toPoints(hfaRef, 'age_month', 'normal_to'), borderColor: '#38bdf8', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Tall', data: toPoints(hfaRef, 'age_month', 'tall'), borderColor: '#0ea5e9', backgroundColor: 'transparent', borderWidth: 1.6, pointRadius: 0, tension: 0.25 },
             { label: 'Child', data: hfaChild, borderColor: childLineColor, backgroundColor: childLineColor, borderWidth: 2.4, pointRadius: 3, pointHoverRadius: 6, tension: 0.15 }
-        ], 'Age (months)', 'Height (cm)', 0, 59, isCompactViewport ? 6 : 1, null, 43, 119, isCompactViewport ? 4 : 1);
+        ], 'Age (months)', 'Height (cm)',
+            hfaX.min, hfaX.max, hfaX.expanded ? expandedAxisStep(hfaX.min, hfaX.max, hfaXDef.step) : hfaXDef.step,
+            null, null, null,
+            hfaY.min, hfaY.max, null, hfaYLabelCallback, false, hfaYGridStep, null);
     }
 
     if (hasRecords && wflRef.length) {
+        const wflXDef = { min: 65, max: 120, step: isCompactViewport ? 5 : 1 };
+        const wflYDef = { min: 1, max: 34, step: isCompactViewport ? 2 : 1 };
+        const wflX = fitAxisToChild(wflXDef.min, wflXDef.max, childAxisValues(wflChild, 'x'));
+        const wflY = fitAxisToChild(wflYDef.min, wflYDef.max, childAxisValues(wflChild, 'y'));
+
+        const wflHeightLabelStep = 5;
+        const wflXGridStep = 1;
+        const wflYGridStep = 1;
+
         const wflTickLabel = (value) => {
             const v = Number(value);
-            if (v === 1 || v >= 4) {
-                return String(v);
+            if (!wflY.expanded) {
+                if (v === 1 || v >= 4) return String(v);
+                return '';
             }
-            return '';
+            if (v === wflY.min || v === wflY.max) return String(v);
+            if (v === 1) return '1';
+            const step = wflY.expanded ? expandedAxisStep(wflY.min, wflY.max, wflYDef.step) : wflYDef.step;
+            return v % Math.max(step, 2) === 0 ? String(v) : '';
         };
 
         const wflXLabel = (value) => {
             const v = Number(value);
-            return v % 5 === 0 ? String(v) : '';
+            if (!Number.isFinite(v)) return '';
+            const start = Math.ceil(wflX.min / wflHeightLabelStep) * wflHeightLabelStep;
+            if (v < start || v > wflX.max) return '';
+            return v % wflHeightLabelStep === 0 ? String(v) : '';
         };
 
         makeEccdLineChart('wflEccdChart', [
@@ -260,7 +382,9 @@ document.addEventListener('DOMContentLoaded', function () {
             { label: 'Overweight', data: toPoints(wflRef, 'length_cm', 'overweight_to'), borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 1.8, pointRadius: 0, tension: 0.25 },
             { label: 'Obese', data: toPoints(wflRef, 'length_cm', 'obese'), borderColor: '#f87171', backgroundColor: 'transparent', borderWidth: 1.8, pointRadius: 0, tension: 0.25 },
             { label: 'Child', data: wflChild, borderColor: childLineColor, backgroundColor: childLineColor, borderWidth: 2.4, pointRadius: 3, pointHoverRadius: 6, tension: 0.15 }
-        ], 'Length/Height (cm)', 'Weight (kg)', 65, 120, isCompactViewport ? 5 : 1, wflXLabel, 1, 34, isCompactViewport ? 2 : 1, wflTickLabel, false);
+        ], 'Length/Height (cm)', 'Weight (kg)',
+            wflX.min, wflX.max, null, wflXLabel, wflXGridStep, wflHeightLabelStep,
+            wflY.min, wflY.max, null, wflTickLabel, false, wflYGridStep, null);
     }
 
     const bindModal = (openId, modalId, closeId, backdropId) => {

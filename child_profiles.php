@@ -95,6 +95,28 @@ function status_abbrev($status) {
     return strtoupper((string)$status);
 }
 
+function build_display_name(string $first = '', string $middle = '', string $last = '', string $suffix = ''): string
+{
+    $first = trim($first);
+    $middle = trim($middle);
+    $last = trim($last);
+    $suffix = trim($suffix);
+
+    if ($last !== '') {
+        $parts = [$last . ',', $first];
+    } else {
+        $parts = [$first];
+    }
+    if ($middle !== '') {
+        $parts[] = $middle;
+    }
+    if ($suffix !== '') {
+        $parts[] = $suffix;
+    }
+
+    return trim(implode(' ', array_filter($parts)));
+}
+
 function fetch_barangay_info($conn, $barangayId) {
     if (!$barangayId) {
         return null;
@@ -332,7 +354,7 @@ if ($cutoffRecordId > 0 && isset($conn) && $conn instanceof mysqli && $conn->con
 }
 
 
-$baseSql = 'SELECT c.*, b.barangay_name, g.first_name AS guardian_first, g.last_name AS guardian_last,
+    $baseSql = 'SELECT c.*, b.barangay_name, g.first_name AS guardian_first, g.last_name AS guardian_last, g.middle_name AS guardian_middle, g.suffix AS guardian_suffix,
             gr.record_id AS latest_record_id, gr.height AS latest_height, gr.weight AS latest_weight,
             gr.muac_measurement AS latest_muac, gr.muac_id AS latest_muac_id,
             gr.measurement_date AS latest_measurement_date,
@@ -405,7 +427,7 @@ if ($getMonthFrom > 0 || $getYear > 0) {
 }
 
 $baseSql .= " WHERE " . implode(" AND ", $whereClauses);
-$baseSql .= " ORDER BY b.barangay_name ASC, c.last_name ASC, c.first_name ASC";
+$baseSql .= " ORDER BY b.barangay_name ASC, g.last_name ASC, g.first_name ASC, g.middle_name ASC, g.suffix ASC, c.last_name ASC, c.first_name ASC";
 
 $stmtList = $conn->prepare($baseSql);
 if ($stmtList) {
@@ -596,6 +618,9 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
     <link rel="stylesheet" href="css/tailwind.css">
     <link rel="stylesheet" href="css/child_profiles.css">
     <link rel="stylesheet" href="css/growth-status.css">
+    <?php if ($isPrintReport): ?>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <?php endif; ?>
 
 </head>
 <body class="bg-slate-100 text-slate-900 font-sans text-[14px]<?= $printBodyClass ?>" data-server-today="<?= date('Y-m-d'); ?>" data-hide-print-barangay="<?= $hidePrintBarangayColumnDefault ? '1' : '0' ?>" data-print-barangay-default="<?= htmlspecialchars($printBarangayName) ?>">
@@ -650,8 +675,13 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 More Filters
                 <svg id="iconToggleFilters" class="transition-transform duration-200" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </button>
-            <button type="button" id="btnGenerateReport" class="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+            <button type="button" id="btnGenerateReport" class="inline-flex items-center gap-2 rounded-md border border-transparent bg-blue-600 px-3 py-2 text-[0.8rem] font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M6 9V3h12v6"/><path d="M6 21H4a2 2 0 0 1-2-2v-5h20v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>
                 Print
+            </button>
+            <button type="button" id="btnExportExcel" class="inline-flex items-center gap-2 rounded-md border border-transparent bg-blue-600 px-3 py-2 text-[0.8rem] font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Export Excel
             </button>
             <?php if (!$isBns && !$isHw): ?>
             <?php 
@@ -820,7 +850,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 <?php $printSeq = 1; ?>
                 <?php foreach ($rows as $row): ?>
                 <?php
-                    $childFullName = trim(preg_replace('/\s+/', ' ', $row['first_name'] . ' ' . ($row['middle_name'] ?? '') . ' ' . $row['last_name'] . ($row['suffix'] ? ' ' . $row['suffix'] : '')));
+                    $childFullName = build_display_name($row['first_name'] ?? '', $row['middle_name'] ?? '', $row['last_name'] ?? '', $row['suffix'] ?? '');
                     $heightDisplay = $row['latest_height'] > 0 ? number_format((float)$row['latest_height'], 1) : '—';
                     $weightDisplay = $row['latest_weight'] > 0 ? number_format((float)$row['latest_weight'], 1) : '—';
                     $birthdatePrint = '—';
@@ -867,7 +897,24 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                         $addressDisplay = $row['barangay_name'] ?? '—';
                     }
                     $barangayDisplay = $row['barangay_name'] ?? '—';
-                    $guardianDisplay = trim((string)($row['guardian_first'] . ' ' . $row['guardian_last']));
+                    $g_ln = trim((string)($row['guardian_last'] ?? ''));
+                    $g_fn = trim((string)($row['guardian_first'] ?? ''));
+                    $g_mn = trim((string)($row['guardian_middle'] ?? ''));
+                    $g_sx = trim((string)($row['guardian_suffix'] ?? ''));
+
+                    $g_parts = [];
+                    if ($g_ln !== '') {
+                        $g_parts[] = $g_ln . ',';
+                    }
+                    $g_firstMiddle = trim($g_fn . ' ' . $g_mn);
+                    if ($g_firstMiddle !== '') {
+                        $g_parts[] = $g_firstMiddle;
+                    }
+                    if ($g_sx !== '') {
+                        $g_parts[] = $g_sx;
+                    }
+
+                    $guardianDisplay = trim(implode(' ', $g_parts));
                     $guardianDisplay = $guardianDisplay !== '' ? $guardianDisplay : '—';
                     $sexDisplay = $row['sex'] === 'Male' ? 'M' : ($row['sex'] === 'Female' ? 'F' : '—');
                     
@@ -1014,7 +1061,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 </tr>
                 <?php foreach ($rows as $i => $row): ?>
                 <?php
-                    $childFullName = trim(preg_replace('/\s+/', ' ', $row['first_name'] . ' ' . ($row['middle_name'] ?? '') . ' ' . $row['last_name'] . ($row['suffix'] ? ' ' . $row['suffix'] : '')));
+                    $childFullName = build_display_name($row['first_name'] ?? '', $row['middle_name'] ?? '', $row['last_name'] ?? '', $row['suffix'] ?? '');
                     $heightDisplay = $row['latest_height'] > 0 ? number_format((float)$row['latest_height'], 1) : '—';
                     $weightDisplay = $row['latest_weight'] > 0 ? number_format((float)$row['latest_weight'], 1) : '—';
                     $birthdateDisplay = '—';
@@ -1060,7 +1107,24 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                         $addressDisplay = $row['barangay_name'] ?? '—';
                     }
                     $barangayDisplay = $row['barangay_name'] ?? '—';
-                    $guardianDisplay = trim((string)($row['guardian_first'] . ' ' . $row['guardian_last']));
+                    $g_ln = trim((string)($row['guardian_last'] ?? ''));
+                    $g_fn = trim((string)($row['guardian_first'] ?? ''));
+                    $g_mn = trim((string)($row['guardian_middle'] ?? ''));
+                    $g_sx = trim((string)($row['guardian_suffix'] ?? ''));
+
+                    $g_parts = [];
+                    if ($g_ln !== '') {
+                        $g_parts[] = $g_ln . ',';
+                    }
+                    $g_firstMiddle = trim($g_fn . ' ' . $g_mn);
+                    if ($g_firstMiddle !== '') {
+                        $g_parts[] = $g_firstMiddle;
+                    }
+                    if ($g_sx !== '') {
+                        $g_parts[] = $g_sx;
+                    }
+
+                    $guardianDisplay = trim(implode(' ', $g_parts));
                     $guardianDisplay = $guardianDisplay !== '' ? $guardianDisplay : '—';
                     $sexDisplay = $row['sex'] === 'Male' ? 'M' : ($row['sex'] === 'Female' ? 'F' : '—');
 
@@ -1564,6 +1628,64 @@ window.highlightConfig = {
 <script src="javascript/child_profiles.js?v=<?= time() ?>"></script>
 <?php if ($isPrintReport): ?>
 <script>
+    window.saveAsPDF = function() {
+        return new Promise((resolve, reject) => {
+            if (typeof html2pdf === 'undefined') {
+                reject(new Error('html2pdf library is not available.'));
+                return;
+            }
+
+            const source = document.querySelector('.print-wrap');
+            if (!source) {
+                reject(new Error('Printable report content not found.'));
+                return;
+            }
+
+            const sandbox = document.createElement('div');
+            sandbox.style.position = 'fixed';
+            sandbox.style.left = '-100000px';
+            sandbox.style.top = '0';
+            sandbox.style.width = '1200px';
+            sandbox.style.background = '#ffffff';
+            sandbox.style.zIndex = '-1';
+
+            const exportNode = source.cloneNode(true);
+            exportNode.querySelectorAll('.no-print').forEach((el) => el.remove());
+            exportNode.querySelectorAll('.print-only').forEach((el) => {
+                el.classList.remove('print-only');
+            });
+
+            sandbox.appendChild(exportNode);
+            document.body.appendChild(sandbox);
+
+            const barangayName = (document.getElementById('printMetaBarangay')?.textContent || 'Nut_Status')
+                .replace(/Barangay:\s*/i, '')
+                .trim()
+                .replace(/[^a-z0-9_-]+/gi, '_');
+
+            const options = {
+                margin: [0.2, 0.2, 0.2, 0.2],
+                filename: `Nut_Status_Report_${barangayName}_${new Date().getFullYear()}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    letterRendering: true
+                },
+                jsPDF: { unit: 'in', format: 'legal', orientation: 'landscape' },
+                pagebreak: { mode: ['css', 'legacy'] }
+            };
+
+            html2pdf().set(options).from(exportNode).save().then(() => {
+                sandbox.remove();
+                resolve();
+            }).catch((err) => {
+                sandbox.remove();
+                reject(err);
+            });
+        });
+    };
+
     document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             window.print();

@@ -199,7 +199,7 @@ function upsertInterventionRow(payload) {
             </td>
             <td style="text-align:center;">
                 <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
-                    <a href="${buildViewLink(typeId, description, date)}" class="tbl-btn-view btn-view-page">
+                    <a href="${buildViewLink(typeId, description, date)}" class="tbl-btn-view btn-view-page" style="background:#059669 !important; border-color:#059669 !important; box-shadow:0 4px 12px rgba(5,150,105,.22) !important;">
                         <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                         View
                     </a>
@@ -219,7 +219,18 @@ function upsertInterventionRow(payload) {
         tableBody.appendChild(row);
     } else {
         const viewLink = row.querySelector('.btn-view-page');
-        if (viewLink) viewLink.href = buildViewLink(typeId, description, date);
+        if (viewLink) {
+            // Prefer server-supplied view URL when available (merge target case)
+            if (payload && payload.view_url) {
+                viewLink.href = payload.view_url;
+            } else {
+                viewLink.href = buildViewLink(typeId, description, date);
+            }
+            // Ensure consistent green styling for dynamically inserted links
+            viewLink.style.background = '#059669';
+            viewLink.style.borderColor = '#059669';
+            viewLink.style.boxShadow = '0 4px 12px rgba(5,150,105,.22)';
+        }
         const badge = row.querySelector('.type-badge');
         if (badge) badge.textContent = typeName;
         row.setAttribute('data-type-name', typeName);
@@ -533,6 +544,14 @@ function syncGiveOutQtyInputDefault() {
     }
 }
 
+// Disable manual editing of give-out qty input when Give Out mode is active
+function setGiveOutQtyInputEditable(editable) {
+    if (!giveOutQtyInput) return;
+    giveOutQtyInput.disabled = !editable;
+    giveOutQtyInput.title = editable ? 'Total pieces to give out — must equal how many children you select (1 per child).' : 'Quantity is auto-set based on selected children and cannot be edited.';
+    if (!editable) giveOutQtyInput.classList.add('disabled'); else giveOutQtyInput.classList.remove('disabled');
+}
+
 function removeGiveOutItem(inventoryId) {
     delete giveOutCart[inventoryId];
     renderGiveOutCart();
@@ -556,11 +575,12 @@ function renderGiveOutCart() {
     ids.forEach(id => {
         const item = giveOutCart[id];
         const row = document.createElement('tr');
+        // Qty input is read-only/disabled — quantities are driven by selected children
         row.innerHTML = `
             <td>${escHtml(item.name)}</td>
             <td style="text-align:center;">${item.maxQty} ${escHtml(item.unit)}</td>
             <td style="text-align:center;">
-                <input type="number" min="1" max="${item.maxQty}" value="${item.qty}" data-giveout-qty="${id}" title="Must equal number of selected children" class="field-input" style="max-width:90px;margin:0 auto;padding:5px 8px;font-size:12px;">
+                <input type="number" min="1" max="${item.maxQty}" value="${item.qty}" data-giveout-qty="${id}" title="Quantity is auto-set based on selected children and cannot be edited." class="field-input" style="max-width:90px;margin:0 auto;padding:5px 8px;font-size:12px;" disabled>
             </td>
             <td style="text-align:center;">
                 <button type="button" class="giveout-remove-btn" data-giveout-remove="${id}">Remove</button>
@@ -589,6 +609,8 @@ function toggleGiveOutSection() {
     const selectedTypeId = parseInt(typeSelectModal.value || '0', 10);
     const show = selectedTypeId === giveOutTypeId;
     giveOutWrap.classList.toggle('active', show && childPickerMode !== 'edit');
+    // When Give Out type is selected, quantities are derived from selected children — disable manual editing
+    setGiveOutQtyInputEditable(!show);
     if (!show || childPickerMode === 'edit') {
         resetGiveOutCart();
     } else {
@@ -830,6 +852,7 @@ function submitInterventionAjax() {
                 const payload = json.payload || {};
                 if (payload.type_id) {
                     upsertInterventionRow(payload);
+                        if (typeof window.refreshDistHistory === 'function') window.refreshDistHistory();
                 }
                 showToast('success', json.message || 'Intervention saved successfully.');
                 closeModal('interventionModal');
@@ -1226,6 +1249,16 @@ function applyChildPickerMode() {
         row.style.display = (searchMatch && modeMatch) ? '' : 'none';
     });
     syncSelectedRowState();
+    updateChildrenCount();
+}
+
+function updateChildrenCount() {
+    const rows = Array.from(document.querySelectorAll('#childrenList .child-check-row'));
+    const visible = rows.filter(r => r.style.display !== 'none');
+    const visibleCountEl = document.getElementById('childrenVisibleCount');
+    const totalCountEl = document.getElementById('childrenTotalCount');
+    if (visibleCountEl) visibleCountEl.textContent = String(visible.length);
+    if (totalCountEl) totalCountEl.textContent = String(rows.length);
 }
 
 /* ── Table search ── */

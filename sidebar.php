@@ -103,7 +103,6 @@ if ($current_role === 'Barangay Nutrition Scholars') {
                 <span class="sb-label">Child Profiles</span>
                 <span class="sb-mini">Profiles</span>
             </a>
-            <?php if (!$is_bns && !$is_hw): ?>
             <a href="archive_children.php" class="<?= $current_page === 'archive_children.php' ? 'active' : '' ?>">
                 <span class="sb-icon">
                     <svg viewBox="0 0 24 24">
@@ -115,7 +114,7 @@ if ($current_role === 'Barangay Nutrition Scholars') {
                 <span class="sb-label">Archive</span>
                 <span class="sb-mini">Archive</span>
             </a>
-            <?php endif; ?>
+            
 
               <?php if (!$is_bns && !$is_hw && !$is_staff): ?>
                  <span class="sb-section">Manage</span>

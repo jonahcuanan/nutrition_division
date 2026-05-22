@@ -304,6 +304,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
         $errors = [];
         if ($firstName === '' || $lastName === '' || $password === '' || $confirmPassword === '' || $role === '' || $contactNumber === '' || $email === '' || $manualUserIdRaw === '')
             $errors[] = 'All required fields must be filled (User ID, Role, Password, Names, Contact, and Email).';
+
+        // Normalize and validate contact number (digits only, up to 11 digits)
+        $contact_digits = preg_replace('/\\D/', '', $contactNumber);
+        if ($contactNumber !== '' && !preg_match('/^\\d{1,11}$/', $contact_digits)) {
+            $errors[] = 'Contact number must be between 1 and 11 digits only (numbers only).';
+        } else {
+            $contactNumber = $contact_digits;
+        }
         if ($password !== $confirmPassword) $errors[] = 'Password and Confirm Password do not match.';
         if (strlen($password) < 6) $errors[] = 'Password must be at least 6 characters long.';
         
@@ -413,6 +421,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
         if ($targetUserId <= 0) $errors[] = 'Invalid user ID.';
         if ($firstName === '' || $lastName === '' || $contactNumber === '' || $email === '') {
             $errors[] = 'First Name, Last Name, Contact Number, and Email are required.';
+        }
+
+        // Normalize and validate contact number for updates (digits only, up to 11 digits)
+        $contact_digits = preg_replace('/\\D/', '', $contactNumber);
+        if ($contactNumber !== '' && !preg_match('/^\\d{1,11}$/', $contact_digits)) {
+            $errors[] = 'Contact number must be between 1 and 11 digits only (numbers only).';
+        } else {
+            $contactNumber = $contact_digits;
         }
         
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -1157,7 +1173,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                 <div class="form-grid-2">
                     <div class="field">
                         <label>Contact Number <span class="req">*</span></label>
-                        <input type="text" name="contact_number" placeholder="e.g. 0912-345-6789" required>
+                        <input type="text" name="contact_number" placeholder="e.g. 0912-345-6789" required maxlength="11" pattern="\d{1,11}" title="Contact number must be between 1 and 11 digits only (numbers only)." inputmode="numeric">
                     </div>
                     <div class="field">
                         <label>Email Address <span class="req">*</span></label>
@@ -1246,7 +1262,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                 <div class="form-grid-2">
                     <div class="field">
                         <label>Contact Number <span class="req">*</span></label>
-                        <input type="text" name="contact_number" id="editContactNumber" required>
+                        <input type="text" name="contact_number" id="editContactNumber" required maxlength="11" pattern="\d{1,11}" title="Contact number must be between 1 and 11 digits only (numbers only)." inputmode="numeric">
                     </div>
                     <div class="field">
                         <label>Email Address <span class="req">*</span></label>

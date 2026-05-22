@@ -43,6 +43,7 @@ $selectedReportType = $_POST['report_type'] ?? '';
 $selectedYear = isset($_POST['report_year']) ? (int)$_POST['report_year'] : (int)date('Y');
 $selectedMonthFrom = isset($_POST['month_from']) && $_POST['month_from'] !== '' ? (int)$_POST['month_from'] : null;
 $selectedMonthTo = isset($_POST['month_to']) && $_POST['month_to'] !== '' ? (int)$_POST['month_to'] : null;
+$monthValidationError = '';
 $bodyPrintClass = '';
 
 // Process form submission
@@ -62,7 +63,7 @@ if (
     $monthTo = $selectedMonthTo;
 
     if ($monthFrom !== null && $monthTo === null) {
-        $monthTo = $monthFrom;
+        $monthValidationError = 'Please select a To Month when From Month is selected.';
     } elseif ($monthTo !== null && $monthFrom === null) {
         $monthFrom = $monthTo;
     } elseif ($monthFrom !== null && $monthTo !== null && $monthFrom > $monthTo) {
@@ -73,14 +74,15 @@ if (
     $selectedMonthFrom = $monthFrom;
     $selectedMonthTo = $monthTo;
     
-    // Fetch barangay info
-    $stmtBarangay = $conn->prepare("SELECT barangay_id, barangay_name, city, province, total_population, estimated_children_measured, psgc FROM barangays WHERE barangay_id = ?");
-    $stmtBarangay->bind_param('i', $selectedBarangayId);
-    $stmtBarangay->execute();
-    $barangayResult = $stmtBarangay->get_result();
-    if ($selectedBarangay = $barangayResult->fetch_assoc()) {
-    // Generate report data
-        $reportData = generateSummaryReport($conn, $selectedBarangayId, $monthFrom, $monthTo, $selectedYear, $isBns, $currentUserId);
+    if ($monthValidationError === '') {
+        // Fetch barangay info
+        $stmtBarangay = $conn->prepare("SELECT barangay_id, barangay_name, city, province, total_population, estimated_children_measured, psgc FROM barangays WHERE barangay_id = ?");
+        $stmtBarangay->bind_param('i', $selectedBarangayId);
+        $stmtBarangay->execute();
+        $barangayResult = $stmtBarangay->get_result();
+        if ($selectedBarangay = $barangayResult->fetch_assoc()) {
+        // Generate report data
+            $reportData = generateSummaryReport($conn, $selectedBarangayId, $monthFrom, $monthTo, $selectedYear, $isBns, $currentUserId);
 
         // Log this report generation with specific details
         $reportTypeLabels = [
@@ -104,8 +106,9 @@ if (
         $logDetails      = 'Generated ' . $reportTypeLabel . ' report for Brgy. '
                            . ($selectedBarangay['barangay_name'] ?? '') . ', ' . $monthLabel . ' ' . $selectedYear;
         log_user_activity($conn, $currentUserId, 'generate_report', $logDetails);
+        }
+        $stmtBarangay->close();
     }
-    $stmtBarangay->close();
 }
 
 function status_cell_class($status) {
@@ -589,6 +592,11 @@ function getAgeGroup($ageMonths, $ageGroups) {
 
             <!-- Report Display -->
             <div id="reportDisplayArea">
+            <?php if ($monthValidationError !== ''): ?>
+                <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+                    <?= htmlspecialchars($monthValidationError) ?>
+                </div>
+            <?php endif; ?>
             <?php if ($reportData !== null && $selectedBarangay): ?>
                 <div class="mt-12 mb-12 print:mt-0 print:mb-0">
                     <?php if ($selectedReportType !== 'nut_status'): ?>
@@ -1768,7 +1776,35 @@ function getAgeGroup($ageMonths, $ageGroups) {
         </div>
     </div>
     <script>
+    function updateMonthDependencyValidation() {
+        const monthFrom = document.getElementById('monthFrom');
+        const monthTo = document.getElementById('monthTo');
+        if (!monthFrom || !monthTo) {
+            return;
+        }
+
+        const fromSelected = monthFrom.value !== '';
+        monthTo.required = fromSelected;
+
+        if (fromSelected && monthTo.value === '') {
+            monthTo.setCustomValidity('Please select To Month when From Month is selected.');
+        } else {
+            monthTo.setCustomValidity('');
+        }
+    }
+
+    document.getElementById('monthFrom')?.addEventListener('change', updateMonthDependencyValidation);
+    document.getElementById('monthTo')?.addEventListener('change', updateMonthDependencyValidation);
+    updateMonthDependencyValidation();
+
     document.getElementById('reportForm').addEventListener('submit', async function(e) {
+        updateMonthDependencyValidation();
+
+        if (!this.checkValidity()) {
+            this.reportValidity();
+            return;
+        }
+
         e.preventDefault();
         
         const btn = this.querySelector('button[type="submit"]');

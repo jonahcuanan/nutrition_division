@@ -274,12 +274,21 @@ if ($stmt) {
                 (float)$r['weight']
             );
         }
+        // Normalize sex to single-letter: male -> 'm', female -> 'f'
+        $sexVal = 'N/A';
+        if (!empty($r['sex'])) {
+            $sRaw = strtolower(trim((string)$r['sex']));
+            if ($sRaw === 'male' || $sRaw === 'M') $sexVal = 'M';
+            elseif ($sRaw === 'female' || $sRaw === 'F') $sexVal = 'F';
+            else $sexVal = substr($sRaw, 0, 1);
+        }
+
         $children[] = [
             'child_id' => (int)($r['child_id'] ?? 0),
             'name' => $name !== '' ? $name : '—',
             'address' => $r['address'] ?? 'N/A',
             'barangay' => $r['barangay_name'] ?? 'N/A',
-            'sex' => !empty($r['sex']) ? (string)$r['sex'] : 'N/A',
+            'sex' => $sexVal,
             'date' => $r['intervention_date'] ?? '—',
             'description' => $r['description'] ?? '',
             'weight' => $r['weight'] !== null ? number_format((float)$r['weight'], 1) : 'N/A',
@@ -315,8 +324,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'edit
 
     $dateValid = false;
     if ($newDate !== '') {
-        $d = DateTime::createFromFormat('Y-m-d', $newDate);
-        $dateValid = $d && $d->format('Y-m-d') === $newDate;
+        $d = DateTime::createFromFormat('Y-m-d\TH:i', $newDate);
+        $dateValid = $d && $d->format('Y-m-d\TH:i') === $newDate;
     }
     if (!$dateValid) {
         $errors[] = 'Please provide a valid intervention date.';
@@ -348,6 +357,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'edit
                     }
 
                     $stmtUpdate->bind_param('ssi', $newDescription, $newDate, $interventionId);
+                                        $stmtUpdate->bind_param('ssi', $newDescription, $newDate, $interventionId);
                     if (!$stmtUpdate->execute()) {
                         throw new Exception('Failed to update intervention rows.');
                     }
@@ -457,6 +467,8 @@ sort($barangayOptions);
             border-radius:6px; border:1px solid #059669 !important;
             background:#059669 !important; color:#fff !important; text-decoration:none;
             white-space:nowrap;
+            z-index: 5;
+            min-width: 60px;
         }
         .btn-view:hover { background:#047857 !important; }
         .btn-edit {

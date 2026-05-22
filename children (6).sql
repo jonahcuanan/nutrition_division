@@ -300,7 +300,7 @@ CREATE TABLE `interventions` (
   `intervention_id` int(11) NOT NULL,
   `child_id` int(11) NOT NULL,
   `description` text DEFAULT NULL,
-  `intervention_date` date NOT NULL,
+  `intervention_date` date NOT NULL DEFAULT current_timestamp(),
   `type_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

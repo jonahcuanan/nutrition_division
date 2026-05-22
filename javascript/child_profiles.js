@@ -926,6 +926,58 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Export Excel Functionality
+    const btnExportExcel = document.getElementById('btnExportExcel');
+    if (btnExportExcel) {
+        btnExportExcel.addEventListener('click', () => {
+            const screenRows = tableBody ? tableBody.querySelectorAll('tr[data-child-id]') : [];
+            const visibleIds = [];
+            screenRows.forEach(row => {
+                if (row.id === 'screenNoDataRow') return;
+                if (row.style.display !== 'none') {
+                    const childId = row.getAttribute('data-child-id');
+                    if (childId) {
+                        visibleIds.push(childId);
+                    }
+                }
+            });
+
+            if (visibleIds.length === 0) {
+                showToast('error', 'No visible children to export.');
+                return;
+            }
+
+            // Grab the current selected Barangay name/text from the filter to supply it as a subtitle meta
+            let selectedBrName = '';
+            if (barangayFilter && barangayFilter.value) {
+                selectedBrName = barangayFilter.options[barangayFilter.selectedIndex].text;
+            }
+
+            // Submit form to export_profiles.php
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = 'export_profiles.php';
+            form.target = '_blank';
+
+            const inputIds = document.createElement('input');
+            inputIds.type = 'hidden';
+            inputIds.name = 'child_ids';
+            inputIds.value = visibleIds.join(',');
+            form.appendChild(inputIds);
+
+            const inputBarangay = document.createElement('input');
+            inputBarangay.type = 'hidden';
+            inputBarangay.name = 'filter_barangay';
+            inputBarangay.value = selectedBrName;
+            form.appendChild(inputBarangay);
+
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        });
+    }
+
+
     // Pre-populate filters from URL query parameters on load
     function initFiltersFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -1103,6 +1155,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const archiveDateInput = document.getElementById('archiveDate');
     const archiveError = document.getElementById('archiveError');
     let archiveChildId = null;
+    let archiveBirthdate = null;
+    let archiveThresholdYMD = null; // birthdate + 4 years 11 months
 
     function openArchiveModal(childId) {
         archiveChildId = childId;
@@ -1112,6 +1166,130 @@ document.addEventListener('DOMContentLoaded', () => {
         archiveBox.classList.add('translate-y-0', 'scale-100');
         archiveReason.value = '';
         archiveError.classList.add('hidden');
+        // Fetch child's birthdate to compute allowed archive date range
+        archiveBirthdate = null;
+        archiveThresholdYMD = null;
+        if (!childId) return;
+        fetch(`child_profiles.php?action=get_child_profile&child_id=${encodeURIComponent(childId)}`)
+            .then(res => res.json())
+            .then(json => {
+                if (!json || !json.success || !json.data) return;
+                const b = json.data.birthdate || '';
+                if (!b) return;
+                archiveBirthdate = b; // yyyy-mm-dd
+
+                // compute threshold = birthdate + 4 years + 11 months
+                const bd = new Date(b);
+                if (isNaN(bd.getTime())) return;
+                const th = new Date(bd);
+                th.setFullYear(th.getFullYear() + 4);
+                th.setMonth(th.getMonth() + 11);
+                // normalize to yyyy-mm-dd
+                const y = th.getFullYear();
+                const m = String(th.getMonth() + 1).padStart(2, '0');
+                const d = String(th.getDate()).padStart(2, '0');
+                archiveThresholdYMD = `${y}-${m}-${d}`;
+
+                // set input limits: min = birthdate, max = server today
+                const serverToday = document.body.getAttribute('data-server-today') || null;
+                try {
+                    archiveDateInput.min = archiveBirthdate;
+                    archiveDateInput.max = serverToday || (new Date()).toISOString().slice(0,10);
+
+                    // default value: threshold if <= today, otherwise today's date
+                    const todayStr = archiveDateInput.max;
+                    if (archiveThresholdYMD <= todayStr) {
+                        archiveDateInput.value = archiveThresholdYMD;
+                    } else {
+                        archiveDateInput.value = todayStr;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            })
+            .catch(() => { /* ignore fetch errors, leave defaults */ });
+    }
+
+    function calcMonthsBetween(birthYMD, refYMD) {
+        if (!birthYMD || !refYMD) return null;
+        const b = new Date(birthYMD);
+        const r = new Date(refYMD);
+        if (isNaN(b.getTime()) || isNaN(r.getTime()) || r < b) return null;
+        let months = (r.getFullYear() - b.getFullYear()) * 12 + (r.getMonth() - b.getMonth());
+        if (r.getDate() < b.getDate()) months--;
+        return months >= 0 ? months : 0;
+    }
+
+    // Validate OverAge selection immediately when user picks a status
+    if (archiveReason) {
+        archiveReason.addEventListener('change', () => {
+            archiveError.classList.add('hidden');
+            archiveError.textContent = '';
+            btnArchiveConfirm.disabled = false;
+
+            const reason = archiveReason.value;
+            const serverToday = document.body.getAttribute('data-server-today') || (new Date()).toISOString().slice(0,10);
+
+            if (reason === 'OverAge') {
+                // ensure we have birthdate; if not, try fetching
+                const proceedWithValidation = () => {
+                    if (!archiveBirthdate) {
+                        archiveError.textContent = 'Unable to validate OverAge: birthdate missing.';
+                        archiveError.classList.remove('hidden');
+                        btnArchiveConfirm.disabled = true;
+                        return;
+                    }
+                    const ageMonths = calcMonthsBetween(archiveBirthdate, serverToday);
+                    if (ageMonths === null) {
+                        archiveError.textContent = 'Unable to validate age for OverAge status.';
+                        archiveError.classList.remove('hidden');
+                        btnArchiveConfirm.disabled = true;
+                        return;
+                    }
+                    // require at least 59 months for OverAge
+                    if (ageMonths < 59) {
+                        archiveError.textContent = `Child is only ${ageMonths} month${ageMonths !== 1 ? 's' : ''}; OverAge requires 59 months.`;
+                        archiveError.classList.remove('hidden');
+                        btnArchiveConfirm.disabled = true;
+                        return;
+                    }
+
+                    // valid: ensure archive date is not before threshold (birth + 4y11m)
+                    if (archiveThresholdYMD && archiveDateInput.value && archiveDateInput.value < archiveThresholdYMD) {
+                        archiveDateInput.value = archiveThresholdYMD;
+                    }
+                    archiveError.classList.add('hidden');
+                    btnArchiveConfirm.disabled = false;
+                };
+
+                if (!archiveBirthdate) {
+                    // fetch birthdate if not available
+                    if (!archiveChildId) {
+                        archiveError.textContent = 'Unable to validate OverAge: child not selected.';
+                        archiveError.classList.remove('hidden');
+                        btnArchiveConfirm.disabled = true;
+                    } else {
+                        fetch(`child_profiles.php?action=get_child_profile&child_id=${encodeURIComponent(archiveChildId)}`)
+                            .then(res => res.json())
+                            .then(json => {
+                                if (json && json.success && json.data && json.data.birthdate) {
+                                    archiveBirthdate = json.data.birthdate;
+                                    // recompute threshold
+                                    const bd = new Date(archiveBirthdate);
+                                    const th = new Date(bd);
+                                    th.setFullYear(th.getFullYear() + 4);
+                                    th.setMonth(th.getMonth() + 11);
+                                    archiveThresholdYMD = `${th.getFullYear()}-${String(th.getMonth()+1).padStart(2,'0')}-${String(th.getDate()).padStart(2,'0')}`;
+                                }
+                            })
+                            .finally(proceedWithValidation)
+                            .catch(() => proceedWithValidation());
+                    }
+                } else {
+                    proceedWithValidation();
+                }
+            }
+        });
     }
 
     function closeArchiveModal() {
@@ -1141,6 +1319,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const date = archiveDateInput.value;
 
         if (!reason) {
+            archiveError.classList.remove('hidden');
+            return;
+        }
+
+        // If OverAge is selected, ensure the selected date is at least birthdate + 4y11m
+        if (reason === 'OverAge' && archiveThresholdYMD) {
+            if (!date || date < archiveThresholdYMD) {
+                archiveError.textContent = 'For OverAge, the archival date must be at least 4 years and 11 months after birth.';
+                archiveError.classList.remove('hidden');
+                return;
+            }
+        }
+
+        // Generic validation: date must be present and not in the future
+        const serverToday = document.body.getAttribute('data-server-today') || (new Date()).toISOString().slice(0,10);
+        if (!date) {
+            archiveError.textContent = 'Please select an archival date.';
+            archiveError.classList.remove('hidden');
+            return;
+        }
+        if (date > serverToday) {
+            archiveError.textContent = 'Archival date cannot be in the future.';
             archiveError.classList.remove('hidden');
             return;
         }

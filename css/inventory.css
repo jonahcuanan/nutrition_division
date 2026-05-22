@@ -537,6 +537,117 @@ tbody td {
     border: 1px solid var(--slate-300);
 }
 
+/* Stock list: only action buttons are interactive */
+.inv-stock-row--available,
+.inv-stock-row--expired {
+    pointer-events: none;
+}
+
+.inv-stock-row--available .inv-actions-cell,
+.inv-stock-row--expired .inv-actions-cell {
+    pointer-events: auto;
+}
+
+.inv-non-clickable {
+    cursor: default;
+}
+
+.btn-remove-expired {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-remove-expired:hover {
+    background: #fee2e2;
+    border-color: #f87171;
+}
+
+.btn-zero-expired-stock {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #fcd34d;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-zero-expired-stock:hover {
+    background: #fef3c7;
+    border-color: #f59e0b;
+}
+
+.inv-actions-cell {
+    min-width: 370px !important;
+    text-align: center !important;
+}
+
+.inv-action-group {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+    width: 100% !important;
+}
+
+.inv-action-group .btn,
+.inv-action-group .inv-action-note {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 115px !important;
+    min-width: 115px !important;
+    max-width: 115px !important;
+    height: 34px !important;
+    padding: 0 8px !important;
+    font-size: 0.76rem !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    box-sizing: border-box !important;
+    white-space: nowrap !important;
+    margin: 0 !important;
+    text-decoration: none !important;
+}
+
+.inv-action-group form {
+    display: inline-flex !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.inv-action-group .btn svg {
+    margin: 0 4px 0 0 !important;
+    flex-shrink: 0 !important;
+}
+
+.inv-action-note {
+    font-size: 0.74rem !important;
+    font-weight: 700 !important;
+    color: var(--slate-500) !important;
+    background: var(--slate-100) !important;
+    border: 1px dashed var(--slate-300) !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+}
+
 .exp-ok {
     color: #374151;
     font-size: 0.82rem;
@@ -1315,6 +1426,36 @@ tbody td {
 
     .table-stack .qty-cell {
         text-align: left;
+    }
+
+    .table-stack td.inv-actions-cell {
+        display: block !important;
+        min-width: 0 !important;
+        text-align: left !important;
+        width: 100% !important;
+        padding: 8px 0 !important;
+    }
+
+    .table-stack td.inv-actions-cell::before {
+        display: block !important;
+        margin-bottom: 8px !important;
+    }
+
+    .table-stack .inv-action-group {
+        flex-wrap: wrap !important;
+        justify-content: flex-start !important;
+        gap: 6px !important;
+        width: 100% !important;
+    }
+
+    .table-stack .inv-action-group .btn,
+    .table-stack .inv-action-group .inv-action-note {
+        width: calc(50% - 3px) !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: 32px !important;
+        font-size: 0.72rem !important;
+        padding: 0 6px !important;
     }
 
     .card {

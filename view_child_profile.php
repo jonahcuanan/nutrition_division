@@ -221,10 +221,15 @@ if ($childId <= 0) {
                         $dateVal = (string)($row['intervention_date'] ?? '');
                         if ($dateVal === '' || $dateVal === '0000-00-00') {
                             $dateVal = '—';
+                            $dateDisplay = '—';
+                        } else {
+                            $dateDisplay = date('M d, Y', strtotime($dateVal));
                         }
                         $interventionMap[$interventionId] = [
                             'intervention_id' => $interventionId,
                             'intervention_date' => $dateVal,
+                            'intervention_date_display' => $dateDisplay,
+                            'date_display' => $dateDisplay,
                             'type_name' => $row['type_name'] ?? '—',
                             'description' => $row['description'] ?? '',
                             'items' => [],
@@ -351,10 +356,6 @@ $latestRecord = $records ? $records[0] : null;
     <link rel="stylesheet" href="css/view_child_profile.css">
     <link rel="stylesheet" href="css/growth-status.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-<?php include 'sidebar.php'; ?>
-
 <main class="main-content">
 
     <!-- PAGE HEADER -->

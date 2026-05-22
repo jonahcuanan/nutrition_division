@@ -37,16 +37,57 @@ if ($isArchiveChildAction) {
         if ($nameStmt->execute()) {
             $nameStmt->bind_result($firstName, $middleName, $lastName, $suffix);
             if ($nameStmt->fetch()) {
-                $nameParts = array_filter([
-                    trim((string)$firstName),
-                    trim((string)$middleName),
-                    trim((string)$lastName),
-                    trim((string)$suffix)
-                ]);
-                $childFullName = trim(implode(' ', $nameParts));
+                $ln = trim((string)$lastName);
+                $fn = trim((string)$firstName);
+                $mn = trim((string)$middleName);
+                $sx = trim((string)$suffix);
+
+                $parts = [];
+                if ($ln !== '') {
+                    $parts[] = $ln . ','; // Lastname,
+                }
+                $firstMiddle = trim($fn . ' ' . $mn);
+                if ($firstMiddle !== '') {
+                    $parts[] = $firstMiddle;
+                }
+                if ($sx !== '') {
+                    $parts[] = $sx;
+                }
+
+                $childFullName = trim(implode(' ', $parts));
             }
         }
         $nameStmt->close();
+    }
+
+    // Server-side: validate OverAge threshold against birthdate
+    $birthdateStmt = $conn->prepare('SELECT birthdate FROM children WHERE child_id = ? LIMIT 1');
+    $childBirthdate = '';
+    if ($birthdateStmt) {
+        $birthdateStmt->bind_param('i', $childId);
+        if ($birthdateStmt->execute()) {
+            $birthdateStmt->bind_result($bd);
+            if ($birthdateStmt->fetch()) {
+                $childBirthdate = trim((string)$bd);
+            }
+        }
+        $birthdateStmt->close();
+    }
+
+    if ($archiveStatus === 'OverAge' && $childBirthdate !== '') {
+        try {
+            $bdObj = new DateTime($childBirthdate);
+            $threshold = clone $bdObj;
+            $threshold->modify('+4 years');
+            $threshold->modify('+11 months');
+            $selDateObj = new DateTime($statusDate);
+            if ($selDateObj < $threshold) {
+                echo json_encode(['success' => false, 'message' => 'Selected archival date is earlier than 4 years and 11 months from birth.']);
+                exit;
+            }
+        } catch (Exception $e) {
+            // ignore parse errors; proceed
+        }
     }
 
     $stmt = $conn->prepare('UPDATE children SET status = ?, status_date = ? WHERE child_id = ?');
@@ -157,7 +198,8 @@ $sql = "SELECT c.child_id, c.first_name, c.middle_name, c.last_name, c.suffix,
                c.sex, c.birthdate, c.address, c.is_ip,
                c.status, c.status_date,
                b.barangay_name,
-               g.first_name AS guardian_first, g.last_name AS guardian_last
+               g.first_name AS guardian_first, g.last_name AS guardian_last,
+               g.middle_name AS guardian_middle, g.suffix AS guardian_suffix
         FROM children c
         LEFT JOIN barangays b ON c.barangay_id = b.barangay_id
         LEFT JOIN guardians g ON c.guardian_id = g.guardian_id
@@ -172,7 +214,7 @@ if ($isBns) {
     $sql .= " AND c.barangay_id = " . (int)$assignedBarangayId;
 }
 
-$sql .= " ORDER BY b.barangay_name ASC, c.last_name ASC, c.first_name ASC";
+$sql .= " ORDER BY b.barangay_name ASC, g.last_name ASC, g.first_name ASC, g.middle_name ASC, g.suffix ASC, c.last_name ASC, c.first_name ASC, c.middle_name ASC, c.suffix ASC";
 $result = $conn->query($sql);
 
 // Collect rows + build barangay list
@@ -315,15 +357,15 @@ sort($uniqueBarangays);
             </div>
             <!-- Sex -->
             <select id="sexFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.85rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
-                <option value="">All Sex</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
+                <option value="">All Sex(Boys & Girls)</option>
+                <option value="male">Male (Boys)</option>
+                <option value="female">Female (Girls)</option>
             </select>
             <!-- IP Status -->
             <select id="ipFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.85rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
-                <option value="">All IP Status</option>
-                <option value="yes">IP</option>
-                <option value="no">Non-IP</option>
+                <option value="">All Groups</option>
+                <option value="yes">Indigenous</option>
+                <option value="no">Non-Indigenous</option>
             </select>
             <!-- Barangay -->
             <select id="barangayFilter" class="h-9 rounded-md border border-slate-300 bg-white px-3 pr-8 text-[0.85rem] text-slate-700 shadow-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100">
@@ -373,9 +415,43 @@ sort($uniqueBarangays);
             <?php if (!empty($rows)): ?>
                 <?php foreach ($rows as $row): ?>
                 <?php
-                    $fullName    = trim($row['first_name'] . ' ' . ($row['middle_name'] ?? '') . ' ' . $row['last_name'] . ($row['suffix'] ? ' ' . $row['suffix'] : ''));
-                    $guardian    = trim(($row['guardian_first'] ?? '') . ' ' . ($row['guardian_last'] ?? ''));
-                    $guardian    = $guardian ?: '—';
+                    $ln = trim((string)($row['last_name'] ?? ''));
+                    $fn = trim((string)($row['first_name'] ?? ''));
+                    $mn = trim((string)($row['middle_name'] ?? ''));
+                    $sx = trim((string)($row['suffix'] ?? ''));
+
+                    $nameParts = [];
+                    if ($ln !== '') {
+                        $nameParts[] = $ln . ',';
+                    }
+                    $firstMiddle = trim($fn . ' ' . $mn);
+                    if ($firstMiddle !== '') {
+                        $nameParts[] = $firstMiddle;
+                    }
+                    if ($sx !== '') {
+                        $nameParts[] = $sx;
+                    }
+
+                    $fullName = trim(implode(' ', $nameParts));
+                    $g_ln = trim((string)($row['guardian_last'] ?? ''));
+                    $g_fn = trim((string)($row['guardian_first'] ?? ''));
+                    $g_mn = trim((string)($row['guardian_middle'] ?? ''));
+                    $g_sx = trim((string)($row['guardian_suffix'] ?? ''));
+
+                    $g_parts = [];
+                    if ($g_ln !== '') {
+                        $g_parts[] = $g_ln . ',';
+                    }
+                    $g_firstMiddle = trim($g_fn . ' ' . $g_mn);
+                    if ($g_firstMiddle !== '') {
+                        $g_parts[] = $g_firstMiddle;
+                    }
+                    if ($g_sx !== '') {
+                        $g_parts[] = $g_sx;
+                    }
+
+                    $guardian = trim(implode(' ', $g_parts));
+                    $guardian = $guardian ?: '—';
                     $address     = trim($row['address'] ?? '');
                     $address     = $address !== '' ? $address : ($row['barangay_name'] ?? '—');
                     $barangay    = $row['barangay_name'] ?? '—';

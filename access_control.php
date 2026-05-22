@@ -100,9 +100,10 @@ function enforce_page_access(array $options = []): void
         return;
     }
 
-    if ($page === 'archive_children.php' && in_array($role, access_archive_restricted_roles(), true)) {
-        deny_access($expectsJson);
-    }
+    // `archive_children.php` is intentionally accessible to barangay-level users
+    // (e.g., Barangay Nutrition Scholars and Health Workers). Specific
+    // filtering by barangay or recorded_by is handled inside
+    // `archive_children.php` so do not deny access here.
 
     if (in_array($page, access_non_admin_pages(), true)) {
         return;

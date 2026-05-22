@@ -8,12 +8,144 @@ if ($currentRole === 'Health Worker') {
     exit;
 }
 require_once 'database.php';
+require_once __DIR__ . '/inventory_utils.php';
+require_once __DIR__ . '/activity_logger.php';
 
 $successMessage = '';
 $errorMessage = '';
+$editErrors = [];
+$editItemId = '';
+$editExpirationDate = '';
+$editItemName = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_item') {
+    $editItemId = trim($_POST['item_id'] ?? '');
+    $editExpirationDate = trim($_POST['expiration_date'] ?? '');
+    $editErrors = [];
+
+    if ($editItemId === '' || !ctype_digit($editItemId)) {
+        $editErrors[] = 'Invalid item selected.';
+    }
+
+    if (empty($editErrors)) {
+        $itemId = (int)$editItemId;
+        sync_inventory_statuses($conn);
+
+        $checkStmt = $conn->prepare('SELECT item_name FROM inventory WHERE inventory_id = ? LIMIT 1');
+        if ($checkStmt) {
+            $checkStmt->bind_param('i', $itemId);
+            $checkStmt->execute();
+            $checkStmt->bind_result($itemName);
+            if (!$checkStmt->fetch()) {
+                $editErrors[] = 'Item not found.';
+            } else {
+                $editItemName = (string)$itemName;
+            }
+            $checkStmt->close();
+        } else {
+            $editErrors[] = 'Database error checking item.';
+        }
+
+        if (empty($editErrors) && $editExpirationDate !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $editExpirationDate)) {
+            $editErrors[] = 'Please enter a valid expiration date.';
+        }
+
+        if (empty($editErrors)) {
+            $expirationValue = $editExpirationDate !== '' ? $editExpirationDate : null;
+            $newStatus = inventory_status_from_expiration($expirationValue);
+
+            if (inventory_status_column_exists($conn)) {
+                $stmt = $conn->prepare('UPDATE inventory SET expiration_date = ?, status = ?, last_updated = NOW() WHERE inventory_id = ? LIMIT 1');
+            } else {
+                $stmt = $conn->prepare('UPDATE inventory SET expiration_date = ?, last_updated = NOW() WHERE inventory_id = ? LIMIT 1');
+            }
+
+            if ($stmt) {
+                if (inventory_status_column_exists($conn)) {
+                    $stmt->bind_param('ssi', $expirationValue, $newStatus, $itemId);
+                } else {
+                    $stmt->bind_param('si', $expirationValue, $itemId);
+                }
+
+                if ($stmt->execute()) {
+                    $stmt->close();
+                    log_user_activity(
+                        $conn,
+                        (int)($_SESSION['user_id'] ?? 0),
+                        'inventory_edit_item',
+                        'Updated expiration for: ' . $editItemName . ' | Expiry: ' . ($editExpirationDate !== '' ? $editExpirationDate : 'No expiry') . ' | Status: ' . $newStatus
+                    );
+                    header('Location: inventory_items.php' . (!empty($_GET) ? '?' . http_build_query($_GET) : ''));
+                    exit;
+                }
+                $editErrors[] = 'Failed to update item. Please try again.';
+                $stmt->close();
+            } else {
+                $editErrors[] = 'Database error updating item.';
+            }
+        }
+    }
+
+    if (!empty($editErrors)) {
+        $errorMessage = $editErrors[0];
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_item') {
+    $deleteItemId = trim($_POST['item_id'] ?? '');
+    $deleteErrors = [];
+
+    if ($deleteItemId === '' || !ctype_digit($deleteItemId)) {
+        $deleteErrors[] = 'Invalid item selected.';
+    }
+
+    if (empty($deleteErrors)) {
+        $itemId = (int)$deleteItemId;
+        $itemRow = fetch_inventory_item_for_action($conn, $itemId);
+
+        if (!$itemRow) {
+            $deleteErrors[] = 'Item not found.';
+        } else {
+            $usageMap = fetch_intervention_usage_counts($conn, [$itemId]);
+            if ((int)($usageMap[$itemId] ?? 0) > 0) {
+                $deleteErrors[] = 'Cannot delete this item because it has existing intervention records.';
+            }
+        }
+
+        if (empty($deleteErrors)) {
+            $itemName = (string)($itemRow['item_name'] ?? 'Item');
+            $deleteStmt = $conn->prepare('DELETE FROM inventory WHERE inventory_id = ? LIMIT 1');
+            if ($deleteStmt) {
+                $deleteStmt->bind_param('i', $itemId);
+                if ($deleteStmt->execute() && $deleteStmt->affected_rows > 0) {
+                    $deleteStmt->close();
+                    log_user_activity(
+                        $conn,
+                        (int)($_SESSION['user_id'] ?? 0),
+                        'inventory_delete_item',
+                        'Deleted inventory item: ' . $itemName
+                    );
+                    header('Location: inventory_items.php' . (!empty($_GET) ? '?' . http_build_query($_GET) : ''));
+                    exit;
+                }
+                $deleteErrors[] = 'Failed to delete item. Please try again.';
+                $deleteStmt->close();
+            } else {
+                $deleteErrors[] = 'Database error deleting item.';
+            }
+        }
+    }
+
+    if (!empty($deleteErrors)) {
+        $errorMessage = $deleteErrors[0];
+    }
+}
 
 if (isset($_GET['restocked']) && $_GET['restocked'] == '1') {
     $successMessage = 'Stock updated! The item quantity has been successfully restocked.';
+} elseif (isset($_GET['item_removed']) && $_GET['item_removed'] == '1') {
+    $successMessage = 'Expired item removed from inventory.';
+} elseif (isset($_GET['stock_zeroed']) && $_GET['stock_zeroed'] == '1') {
+    $successMessage = 'Stock set to zero. This expired item can no longer be used in interventions.';
 }
 
 $categoryId = null;
@@ -21,6 +153,61 @@ $restockErrors = [];
 $restockItemId = '';
 $restockQty = '1';
 $restockRemarks = '';
+
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'zero_expired_stock') {
+    $zeroItemId = trim($_POST['item_id'] ?? '');
+    $zeroErrors = [];
+
+    if ($zeroItemId === '' || !ctype_digit($zeroItemId)) {
+        $zeroErrors[] = 'Invalid item selected.';
+    }
+
+    if (empty($zeroErrors)) {
+        $itemId = (int)$zeroItemId;
+        $itemRow = fetch_inventory_item_for_action($conn, $itemId);
+
+        if (!$itemRow) {
+            $zeroErrors[] = 'Item not found.';
+        } elseif (($itemRow['status'] ?? '') !== 'Expired') {
+            $zeroErrors[] = 'Only expired items can have stock cleared this way.';
+        } elseif ((int)($itemRow['quantity'] ?? 0) <= 0) {
+            $zeroErrors[] = 'Stock is already zero.';
+        }
+
+        if (empty($zeroErrors)) {
+            $itemName = (string)($itemRow['item_name'] ?? 'Item');
+            $zeroStmt = $conn->prepare('UPDATE inventory SET quantity = 0, last_updated = NOW() WHERE inventory_id = ? AND quantity > 0');
+            if ($zeroStmt) {
+                $zeroStmt->bind_param('i', $itemId);
+                if ($zeroStmt->execute() && $zeroStmt->affected_rows > 0) {
+                    $zeroStmt->close();
+                    sync_inventory_statuses($conn);
+                    log_user_activity(
+                        $conn,
+                        (int)($_SESSION['user_id'] ?? 0),
+                        'inventory_zero_expired_stock',
+                        'Set stock to zero (expired): ' . $itemName
+                    );
+                    $redirectParams = $_GET;
+                    unset($redirectParams['stock_zeroed']);
+                    $redirectParams['stock_zeroed'] = '1';
+                    $baseUrl = strtok($_SERVER['REQUEST_URI'], '?');
+                    header('Location: ' . $baseUrl . '?' . http_build_query($redirectParams));
+                    exit;
+                }
+                $zeroErrors[] = 'Failed to update stock. Please try again.';
+                $zeroStmt->close();
+            } else {
+                $zeroErrors[] = 'Database error updating stock.';
+            }
+        }
+    }
+
+    if (!empty($zeroErrors)) {
+        $errorMessage = $zeroErrors[0];
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'restock_item') {
     $restockItemId = trim($_POST['item_id'] ?? '');
@@ -49,6 +236,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resto
             $checkStmt->close();
         } else {
             $restockErrors[] = 'Database error checking item.';
+        }
+
+        if (empty($restockErrors)) {
+            sync_inventory_statuses($conn);
+            $statusStmt = $conn->prepare(
+                inventory_status_column_exists($conn)
+                    ? 'SELECT status FROM inventory WHERE inventory_id = ? LIMIT 1'
+                    : 'SELECT expiration_date FROM inventory WHERE inventory_id = ? LIMIT 1'
+            );
+            if ($statusStmt) {
+                $statusStmt->bind_param('i', $itemId);
+                $statusStmt->execute();
+                if (inventory_status_column_exists($conn)) {
+                    $statusStmt->bind_result($itemStatus);
+                    $statusStmt->fetch();
+                } else {
+                    $expDate = null;
+                    $statusStmt->bind_result($expDate);
+                    $statusStmt->fetch();
+                    $itemStatus = inventory_status_from_expiration($expDate);
+                }
+                $statusStmt->close();
+                if (($itemStatus ?? '') === 'Expired') {
+                    $restockErrors[] = 'Expired items cannot be restocked. Remove the item instead.';
+                }
+            }
         }
 
         if (empty($restockErrors)) {
@@ -104,15 +317,18 @@ if ($catResult && $catResult->num_rows > 0) {
 
 $hasUncategorized = false;
 $inventoryItems = [];
-$today = new DateTime();
+$today = new DateTime('today');
+sync_inventory_statuses($conn);
+$invSelect = inventory_select_columns();
 
 if ($categoryId !== null) {
-    $stmt = $conn->prepare('SELECT i.inventory_id, i.item_name, i.category_id, c.category_name, i.quantity, i.unit, i.expiration_date, i.last_updated FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id WHERE i.category_id = ? ORDER BY i.item_name');
+    $stmt = $conn->prepare("SELECT {$invSelect} FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id WHERE i.category_id = ? ORDER BY i.item_name");
     if ($stmt) {
         $stmt->bind_param('i', $categoryId);
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
+            $row = enrich_inventory_status($row, $today);
             $categoryLabelRow = $row['category_name'] ?: 'Uncategorized';
             if ($row['category_name'] === null || $row['category_name'] === '') {
                 $hasUncategorized = true;
@@ -124,9 +340,10 @@ if ($categoryId !== null) {
         $stmt->close();
     }
 } elseif ($isUncategorized) {
-    $invResult = $conn->query('SELECT i.inventory_id, i.item_name, i.category_id, c.category_name, i.quantity, i.unit, i.expiration_date, i.last_updated FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id WHERE i.category_id IS NULL OR i.category_id = 0 ORDER BY i.item_name');
+    $invResult = $conn->query("SELECT {$invSelect} FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id WHERE i.category_id IS NULL OR i.category_id = 0 ORDER BY i.item_name");
     if ($invResult && $invResult->num_rows > 0) {
         while ($row = $invResult->fetch_assoc()) {
+            $row = enrich_inventory_status($row, $today);
             $row['category_label'] = 'Uncategorized';
             $row['category_key'] = 'uncategorized';
             $inventoryItems[] = $row;
@@ -134,9 +351,10 @@ if ($categoryId !== null) {
     }
     $hasUncategorized = true;
 } else {
-    $invResult = $conn->query('SELECT i.inventory_id, i.item_name, i.category_id, c.category_name, i.quantity, i.unit, i.expiration_date, i.last_updated FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id ORDER BY i.item_name');
+    $invResult = $conn->query("SELECT {$invSelect} FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id ORDER BY i.item_name");
     if ($invResult && $invResult->num_rows > 0) {
         while ($row = $invResult->fetch_assoc()) {
+            $row = enrich_inventory_status($row, $today);
             $categoryLabelRow = $row['category_name'] ?: 'Uncategorized';
             if ($row['category_name'] === null || $row['category_name'] === '') {
                 $hasUncategorized = true;
@@ -150,6 +368,10 @@ if ($categoryId !== null) {
 
 $totalItems = count($inventoryItems);
 $maxQty = 1;
+$interventionUsageByItem = fetch_intervention_usage_counts(
+    $conn,
+    array_column($inventoryItems, 'inventory_id')
+);
 foreach ($inventoryItems as $item) {
     $qty = (int)$item['quantity'];
     if ($qty > $maxQty) $maxQty = $qty;
@@ -232,7 +454,7 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
         }
     </style>
 </head>
-<body data-open-restock-modal="<?= !empty($restockErrors) ? '1' : '0' ?>">
+<body data-open-restock-modal="<?= !empty($restockErrors) ? '1' : '0' ?>" data-open-edit-modal="<?= !empty($editErrors) ? '1' : '0' ?>">
 <?php include 'sidebar.php'; ?>
 
 <main class="main-content">
@@ -261,6 +483,11 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             <strong>Stock updated!</strong>
             <span>The item quantity has been restocked.</span>
         </div>
+    </div>
+    <?php endif; ?>
+    <?php if ($errorMessage !== ''): ?>
+    <div class="alert alert-error" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:8px;margin-bottom:16px;">
+        <strong>Could not complete action:</strong> <?= htmlspecialchars($errorMessage) ?>
     </div>
     <?php endif; ?>
 
@@ -296,6 +523,11 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                 <option value="in">📦 In Stock (Available)</option>
                 <option value="out">❌ Out of Stock (Empty)</option>
             </select>
+            <select class="filter-select" id="itemStatusFilter">
+                <option value="">Show All Item Status</option>
+                <option value="available">🟢 Available</option>
+                <option value="expired">🔴 Expired</option>
+            </select>
             <span class="row-count" id="invCount"><?= $totalItems ?> item<?= $totalItems !== 1 ? 's' : '' ?></span>
         </div>
 
@@ -303,9 +535,9 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             <thead>
                 <tr>
                     <th>Item Name</th>
-                    <th>Category</th>
                     <th class="center">Stock Level</th>
                     <th class="hide-mobile">Expiration Date</th>
+                    <th class="center">Status</th>
                     <th class="hide-mobile">Last Updated</th>
                     <th class="center">Actions</th>
                 </tr>
@@ -341,40 +573,109 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                         }
                     }
                     $lastUpd = $row['last_updated'] ? date('M d, Y', strtotime($row['last_updated'])) : '—';
+                    $itemStatus = (string)($row['status'] ?? 'Available');
+                    $isExpired = $itemStatus === 'Expired';
+                    $statusBadgeClass = $isExpired ? 'badge-red' : 'badge-green';
+                    $inventoryId = (int)$row['inventory_id'];
+                    $usedInInterventions = (int)($interventionUsageByItem[$inventoryId] ?? 0) > 0;
             ?>
-            <tr data-search="<?= strtolower(htmlspecialchars($row['item_name'].' '.$row['category_label'])) ?>" 
-                data-category="<?= htmlspecialchars($row['category_key']) ?>" 
+            <tr class="inv-stock-row <?= $isExpired ? 'inv-stock-row--expired' : 'inv-stock-row--available' ?>"
+                data-search="<?= strtolower(htmlspecialchars($row['item_name'])) ?>" 
                 data-stock="<?= $qty<=5?'low':'ok' ?>"
                 data-expiration="<?= $expirationStatus ?>"
-                data-availability="<?= $availability ?>">
-                <td class="item-name-cell" data-label="Item">
+                data-availability="<?= $availability ?>"
+                data-item-status="<?= strtolower($itemStatus) ?>">
+                <td class="item-name-cell inv-non-clickable" data-label="Item">
                     <strong><?= htmlspecialchars($row['item_name']) ?></strong>
                     <?= $qty===0 ? '<span>Out of stock</span>' : '' ?>
                 </td>
-                <td data-label="Category"><span class="badge badge-blue"><?= htmlspecialchars($row['category_label']) ?></span></td>
                 <td class="qty-cell" data-label="Stock">
                     <span class="qty-number <?= $qtyClass ?>"><?= $qty ?></span>
                     <span class="qty-unit"><?= htmlspecialchars($row['unit']) ?></span>
                     <div class="stock-bar-wrap"><div class="stock-bar <?= $barClass ?>" style="width:<?= $barPct ?>%"></div></div>
                 </td>
-                <td class="hide-mobile" data-label="Expiration">
+                <td class="hide-mobile inv-non-clickable" data-label="Expiration">
                     <span class="<?= $expClass ?>"><?= $expDate ?></span><?= $expExtra ?>
                 </td>
-                <td class="hide-mobile" data-label="Last Updated" style="font-size:0.78rem;color:#9ca3af;">
+                <td class="center inv-non-clickable" data-label="Status">
+                    <span class="badge <?= $statusBadgeClass ?>"><?= htmlspecialchars($itemStatus) ?></span>
+                </td>
+                <td class="hide-mobile inv-non-clickable" data-label="Last Updated" style="font-size:0.78rem;color:#9ca3af;">
                     <?= $lastUpd ?>
                 </td>
-                <td data-label="Action" class="qty-cell">
-                    <button
-                        type="button"
-                        class="btn btn-green btn-restock"
-                        data-item-id="<?= (int)$row['inventory_id'] ?>"
-                        data-item-name="<?= htmlspecialchars($row['item_name'], ENT_QUOTES) ?>"
-                        data-item-unit="<?= htmlspecialchars($row['unit'], ENT_QUOTES) ?>"
-                        data-item-qty="<?= $qty ?>"
-                    >
-                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                        Restock
-                    </button>
+                <td data-label="Action" class="qty-cell inv-actions-cell">
+                    <div class="inv-action-group">
+                        <button
+                            type="button"
+                            class="btn btn-edit js-open-edit-item-modal"
+                            data-item-id="<?= $inventoryId ?>"
+                            data-item-name="<?= htmlspecialchars($row['item_name'], ENT_QUOTES) ?>"
+                            data-item-expiration="<?= htmlspecialchars((string)($row['expiration_date'] ?? ''), ENT_QUOTES) ?>"
+                            data-item-expiration-display="<?= htmlspecialchars($expDate, ENT_QUOTES) ?>"
+                        >
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                            Edit
+                        </button>
+
+                        <?php if ($isExpired): ?>
+                            <?php if ($qty > 0): ?>
+                            <form method="post" class="js-zero-expired-form" style="display:inline-flex;margin:0;">
+                                <input type="hidden" name="action" value="zero_expired_stock">
+                                <input type="hidden" name="item_id" value="<?= $inventoryId ?>">
+                                <button
+                                    type="submit"
+                                    class="btn btn-zero-expired-stock"
+                                    data-item-name="<?= htmlspecialchars($row['item_name'], ENT_QUOTES) ?>"
+                                    title="Set stock to zero so this expired item cannot be used in new interventions"
+                                >
+                                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+                                    Zero Stock
+                                </button>
+                            </form>
+                            <?php else: ?>
+                            <span class="inv-action-note" title="Stock cleared">Stock cleared</span>
+                            <?php endif; ?>
+                        <?php else: ?>
+                        <button
+                            type="button"
+                            class="btn btn-green btn-restock"
+                            data-item-id="<?= (int)$row['inventory_id'] ?>"
+                            data-item-name="<?= htmlspecialchars($row['item_name'], ENT_QUOTES) ?>"
+                            data-item-unit="<?= htmlspecialchars($row['unit'], ENT_QUOTES) ?>"
+                            data-item-qty="<?= $qty ?>"
+                        >
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                            Restock
+                        </button>
+                        <?php endif; ?>
+
+                        <?php if (!$usedInInterventions): ?>
+                        <form method="post" class="js-delete-item-form" style="display:inline-flex;margin:0;">
+                            <input type="hidden" name="action" value="delete_item">
+                            <input type="hidden" name="item_id" value="<?= $inventoryId ?>">
+                            <button
+                                type="button"
+                                class="btn btn-delete js-open-delete-item-modal"
+                                data-item-name="<?= htmlspecialchars($row['item_name'], ENT_QUOTES) ?>"
+                                title="Delete this item"
+                            >
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                                Delete
+                            </button>
+                        </form>
+                        <?php else: ?>
+                        <button
+                            type="button"
+                            class="btn btn-delete disabled"
+                            disabled
+                            aria-disabled="true"
+                            title="Cannot delete because this item has existing intervention records."
+                        >
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                            Delete
+                        </button>
+                        <?php endif; ?>
+                    </div>
                 </td>
             </tr>
             <?php endforeach;
@@ -445,6 +746,91 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             <button type="submit" form="restockForm" class="btn btn-green">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                 Confirm Restock
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ EDIT ITEM MODAL ══ -->
+<div class="modal-overlay" id="editItemModal" data-item-name="<?= htmlspecialchars($editItemName, ENT_QUOTES) ?>" data-item-expiration="<?= htmlspecialchars($editExpirationDate, ENT_QUOTES) ?>" data-item-expiration-display="<?= htmlspecialchars($editExpirationDate !== '' ? $editExpirationDate : '—', ENT_QUOTES) ?>">
+    <div class="modal-backdrop" id="editBackdrop"></div>
+    <div class="modal-box" style="max-width:520px;">
+        <div class="modal-accent accent-blue"></div>
+        <div class="modal-head">
+            <div class="modal-head-left">
+                <div class="modal-head-icon icon-blue">✏️</div>
+                <div>
+                    <h3>Edit Item Expiration</h3>
+                    <p id="editItemName">Update the expiration date</p>
+                </div>
+            </div>
+            <button type="button" class="modal-close-btn" id="editModalClose">✕</button>
+        </div>
+        <div class="modal-body">
+            <?php if (!empty($editErrors)): ?>
+            <div class="modal-alert error">
+                <strong>Please fix the following:</strong>
+                <ul><?php foreach ($editErrors as $e): ?><li><?= htmlspecialchars($e) ?></li><?php endforeach; ?></ul>
+            </div>
+            <?php endif; ?>
+
+            <form method="post" action="" id="editItemForm">
+                <input type="hidden" name="action" value="edit_item">
+                <input type="hidden" name="item_id" id="editItemId" value="<?= htmlspecialchars($editItemId) ?>">
+
+                <div class="item-info-box" style="margin-bottom: 20px;">
+                    <div class="item-info-title">Inventory Details</div>
+                    <div class="item-info-row">
+                        <div class="info-chunk">
+                            <span class="info-label">Current Expiration</span>
+                            <span class="info-value" id="editCurrentExpiration">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-label">Expiration Details</div>
+                <div class="field">
+                    <label>Expiration Date</label>
+                    <input type="date" name="expiration_date" id="editExpirationDate" value="<?= htmlspecialchars($editExpirationDate) ?>">
+                    <span class="field-hint">Leave blank if the item has no expiry date. Status will update automatically.</span>
+                </div>
+            </form>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-outline" id="editModalCancel">Cancel</button>
+            <button type="submit" form="editItemForm" class="btn btn-blue">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Save Changes
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ DELETE ITEM MODAL ══ -->
+<div class="modal-overlay" id="deleteItemModal">
+    <div class="modal-backdrop" id="deleteItemBackdrop"></div>
+    <div class="modal-box" style="max-width:440px;border-radius:14px;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e5e7eb;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:10px;background:#fee2e2;display:flex;align-items:center;justify-content:center;">🗑️</div>
+                <div>
+                    <div style="font-size:15px;font-weight:700;color:#0f172a;">Delete Item</div>
+                    <div style="font-size:12px;color:#64748b;">This action cannot be undone</div>
+                </div>
+            </div>
+            <button type="button" id="deleteItemClose" style="border:none;background:transparent;color:#64748b;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+        </div>
+        <div style="padding:16px;">
+            <div style="font-size:13px;color:#374151;line-height:1.6;">
+                Delete this inventory item?
+                <div id="deleteItemNameText" style="margin-top:8px;font-weight:700;color:#111827;"></div>
+            </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #e5e7eb;">
+            <button type="button" id="deleteItemCancel" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">Cancel</button>
+            <button type="button" id="deleteItemConfirmBtn" class="btn-delete" style="width:auto;margin-top:0;">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                Delete
             </button>
         </div>
     </div>

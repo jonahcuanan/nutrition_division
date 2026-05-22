@@ -5,6 +5,7 @@ require_once __DIR__ . '/access_control.php';
 enforce_page_access();
 
 require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/inventory_utils.php';
 require_once __DIR__ . '/growth_utils.php';
 require_once __DIR__ . '/activity_logger.php';
 
@@ -659,7 +660,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (empty($errors) && !empty($giveOutLines)) {
                 $childrenCount = count($childIds);
-                $checkInv = $conn->prepare('SELECT item_name, quantity FROM inventory WHERE inventory_id = ? LIMIT 1');
+                if (inventory_status_column_exists($conn)) {
+                    $checkInv = $conn->prepare('SELECT item_name, quantity, status FROM inventory WHERE inventory_id = ? LIMIT 1');
+                } else {
+                    $checkInv = $conn->prepare('SELECT item_name, quantity FROM inventory WHERE inventory_id = ? LIMIT 1');
+                }
                 if (!$checkInv) {
                     $errors[] = 'Database error while validating inventory items.';
                 } else {
@@ -667,15 +672,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $totalQtyGiveOut = (int)$totalQtyGiveOut;
                         $itemName = null;
                         $availableQty = null;
+                        $itemStatus = 'Available';
                         $checkInv->bind_param('i', $inventoryId);
                         $checkInv->execute();
-                        $checkInv->bind_result($itemName, $availableQty);
+                        if (inventory_status_column_exists($conn)) {
+                            $checkInv->bind_result($itemName, $availableQty, $itemStatus);
+                        } else {
+                            $checkInv->bind_result($itemName, $availableQty);
+                        }
                         if (!$checkInv->fetch()) {
                             $errors[] = 'Selected inventory item does not exist.';
                             $checkInv->free_result();
                             continue;
                         }
                         $checkInv->free_result();
+
+                        if ($itemStatus === 'Expired') {
+                            $errors[] = '"' . $itemName . '" is expired and cannot be given out.';
+                            continue;
+                        }
+                        if ((int)$availableQty <= 0) {
+                            $errors[] = '"' . $itemName . '" has no stock available.';
+                            continue;
+                        }
 
                         if ($childrenCount > 0 && $totalQtyGiveOut !== $childrenCount) {
                             $errors[] = 'For "' . $itemName . '", quantity (' . $totalQtyGiveOut . ' pcs) must match the number of selected children (' . $childrenCount . ').';
@@ -691,6 +710,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (empty($errors)) {
+            if ($hasDateColumn) {
+                $interventionDateDb = $interventionDate;
+            }
             $stmtChild = $conn->prepare("SELECT COUNT(*) FROM children WHERE child_id = ? AND status = 'Active'");
             $stmtInsert = $hasDateColumn
                 ? $conn->prepare('INSERT INTO interventions (child_id, type_id, description, intervention_date) VALUES (?, ?, ?, ?)')
@@ -727,7 +749,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
 
                         if ($hasDateColumn) {
-                            $stmtInsert->bind_param('iiss', $cid, $typeId, $description, $interventionDate);
+                            $stmtInsert->bind_param('iiss', $cid, $typeId, $description, $interventionDateDb);
                         } else {
                             $stmtInsert->bind_param('iis', $cid, $typeId, $description);
                         }
@@ -1022,8 +1044,13 @@ if ($resultTypes && $resultTypes->num_rows > 0) {
     while ($row = $resultTypes->fetch_assoc()) $types[] = $row;
 }
 
+sync_inventory_statuses($conn);
+
 $inventoryItems = [];
-$inventoryResult = $conn->query('SELECT inventory_id, item_name, quantity, unit, category_id FROM inventory WHERE quantity > 0 ORDER BY item_name ASC');
+$inventorySql = inventory_status_column_exists($conn)
+    ? 'SELECT inventory_id, item_name, quantity, unit, category_id, status FROM inventory WHERE quantity > 0 AND status = \'Available\' ORDER BY item_name ASC'
+    : 'SELECT inventory_id, item_name, quantity, unit, category_id FROM inventory WHERE quantity > 0 ORDER BY item_name ASC';
+$inventoryResult = $conn->query($inventorySql);
 if ($inventoryResult && $inventoryResult->num_rows > 0) {
     while ($row = $inventoryResult->fetch_assoc()) {
         $inventoryItems[] = $row;
@@ -1218,6 +1245,19 @@ function child_label(array $child): string {
 </head>
 <body>
 <?php include 'sidebar.php'; ?>
+
+<style>
+    .intervention-row .tbl-btn-view,
+    .intervention-row .btn-view-page,
+    .intervention-row .tbl-btn-view:hover,
+    .intervention-row .btn-view-page:hover {
+        background: #059669 !important;
+        color: #fff !important;
+        border-color: #059669 !important;
+        box-shadow: 0 4px 12px rgba(5, 150, 105, .22) !important;
+        transform: none !important;
+    }
+</style>
 
 <main class="main-content min-h-screen px-4 md:px-8 py-7 pb-16" style="display:flex;flex-direction:column;gap:20px;">
 
@@ -1557,38 +1597,45 @@ function child_label(array $child): string {
                             <button type="button" id="clearAllBtn" style="font-size:12px;color:var(--slate-500);background:var(--slate-100);border:1px solid var(--slate-200);padding: 4px 12px; border-radius: 6px; cursor:pointer;font-weight:600;">Clear All</button>
                         </div>
                     </div>
-                    <div class="search-wrap" style="margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
+                        <div class="search-wrap" style="flex:1;">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                         <input class="search-input" type="text" id="childSearch" placeholder="Search children by name, location, or health status…" style="width:100%; height: 42px; font-size: 14px;">
+                        </div>
+                        <div id="childrenCountWrap" style="white-space:nowrap;color:var(--slate-700);font-size:13px;">
+                            Showing <strong id="childrenVisibleCount">0</strong> / <strong id="childrenTotalCount"><?= count($children) ?></strong> children
+                        </div>
                     </div>
                     <div class="children-table-wrap" id="childrenList" style="border-radius: 8px; border: 1px solid var(--slate-200);">
                         <table class="child-select-table" id="editChildTable">
                             <thead>
                                 <tr>
-                                        <th style="width:44px;">Select</th>
-                                        <th style="width:12%; text-align:left;">Address</th>
-                                        <th style="width:10%; text-align:left;">Barangay</th>
-                                        <th style="width:12%; text-align:left;">Full Name</th>
-                                        <th style="width:5%;"><span class="child-table-header"><span class="top">Sex</span></span></th>
-                                        <th style="width:6%;"><span class="child-table-header"><span class="top">Age</span><span class="bottom">(months)</span></span></th>
-                                        <th style="width:10%;"><span class="child-table-header"><span class="top">Measurement</span><span class="bottom">Date</span></span></th>
-                                        <th style="width:9%;"><span class="child-table-header"><span class="top">Measurement</span><span class="bottom">Status</span></span></th>
-                                        <th style="width:9%;"><span class="child-table-header"><span class="top">Height for Age</span><span class="bottom">Status</span></span></th>
-                                        <th style="width:9%;"><span class="child-table-header"><span class="top">Weight for Age</span><span class="bottom">Status</span></span></th>
-                                        <th style="width:9%;"><span class="child-table-header"><span class="top">Weight for Ht/L</span><span class="bottom">Status</span></span></th>
+                                    <th style="width:44px;">Select</th>
+                                    <th style="width:12%; text-align:left;">Address</th>
+                                    <th style="width:10%; text-align:left;">Barangay</th>
+                                    <th style="width:12%; text-align:left;">Full Name</th>
+                                    <th style="width:5%;"><span class="child-table-header"><span class="top">Sex</span></span></th>
+                                    <th style="width:6%;"><span class="child-table-header"><span class="top">Age</span><span class="bottom">(months)</span></span></th>
+                                    <th style="width:8%;"><span class="child-table-header"><span class="top">Height</span><span class="bottom">(cm)</span></span></th>
+                                    <th style="width:8%;"><span class="child-table-header"><span class="top">Weight</span><span class="bottom">(kg)</span></span></th>
+                                    <th style="width:10%;"><span class="child-table-header"><span class="top">Measurement</span><span class="bottom">Date</span></span></th>
+                                    <th style="width:9%;"><span class="child-table-header"><span class="top">Height for Age</span><span class="bottom">Status</span></span></th>
+                                    <th style="width:9%;"><span class="child-table-header"><span class="top">Weight for Age</span><span class="bottom">Status</span></span></th>
+                                    <th style="width:9%;"><span class="child-table-header"><span class="top">Weight for Ht/L</span><span class="bottom">Status</span></span></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (!empty($children)): ?>
                                     <?php foreach ($children as $child): ?>
-                                        <?php
+                                            <?php
                                             $searchText = strtolower(trim(
                                                 ($child['name'] ?? '') . ' ' .
                                                 ($child['address'] ?? '') . ' ' .
                                                 ($child['barangay_name'] ?? '') . ' ' .
                                                 ($child['measurement_date'] ?? '') . ' ' .
                                                 ($child['sex'] ?? '') . ' ' .
-                                                ($child['measurement_status'] ?? '') . ' ' .
+                                                (isset($child['height']) ? (string)$child['height'] : '') . ' ' .
+                                                (isset($child['weight']) ? (string)$child['weight'] : '') . ' ' .
                                                 ($child['weight_for_age_status'] ?? '') . ' ' .
                                                 ($child['height_for_age_status'] ?? '') . ' ' .
                                                 ($child['weight_for_ltht_status'] ?? '')
@@ -1614,20 +1661,14 @@ function child_label(array $child): string {
                                             <td class="child-age-cell">
                                                 <?= $child['age_in_months'] !== null ? htmlspecialchars((string)$child['age_in_months']) : 'N/A' ?>
                                             </td>
+                                            <td class="child-height-cell">
+                                                <?= $child['height'] !== null ? htmlspecialchars((string)$child['height']) : '—' ?>
+                                            </td>
+                                            <td class="child-weight-cell">
+                                                <?= $child['weight'] !== null ? htmlspecialchars((string)$child['weight']) : '—' ?>
+                                            </td>
                                             <td class="child-date-cell">
                                                 <?= htmlspecialchars($child['measurement_date'] ?? '—') ?>
-                                            </td>
-                                            <td class="child-status-cell">
-                                                <?php 
-                                                    $ms = $child['measurement_status'] ?? 'N/A';
-                                                    if ($ms === 'New/Update') {
-                                                        echo '<span class="status-pill is-good">New/Update</span>';
-                                                    } elseif ($ms === 'Recent') {
-                                                        echo '<span class="status-pill is-alert">Recent</span>';
-                                                    } else {
-                                                        echo '<span class="status-pill is-muted">N/A</span>';
-                                                    }
-                                                ?>
                                             </td>
                                             <td class="child-status-cell <?= htmlspecialchars(status_cell_class($child['height_for_age_status'] ?? 'N/A')) ?>" title="<?= htmlspecialchars($child['height_for_age_status'] ?? 'N/A') ?>">
                                                 <?= htmlspecialchars(status_abbrev($child['height_for_age_status'] ?? 'N/A')) ?>
@@ -1642,7 +1683,7 @@ function child_label(array $child): string {
                                     <?php endforeach; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="11" class="empty-state" style="padding:28px 16px;">
+                                        <td colspan="12" class="empty-state" style="padding:28px 16px;">
                                             <div class="empty-title">No children found</div>
                                             <div class="empty-sub">There are no active children right now.</div>
                                         </td>

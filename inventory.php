@@ -11,6 +11,7 @@ if ($currentRole === 'Health Worker') {
 }
 require_once 'database.php';
 require_once __DIR__ . '/activity_logger.php';
+require_once __DIR__ . '/inventory_utils.php';
 
 $successMessage = '';
 $errorMessage = '';
@@ -35,6 +36,8 @@ if (isset($_GET['added']) && $_GET['added'] == '1') {
 } elseif (isset($_GET['distributed']) && (int)$_GET['distributed'] > 0) {
     $dc = (int)$_GET['distributed'];
     $successMessage = $dc . ' item type' . ($dc > 1 ? 's were' : ' was') . ' successfully given out and stock counts have been updated.';
+} elseif (isset($_GET['item_removed']) && $_GET['item_removed'] == '1') {
+    $successMessage = 'Expired item removed from inventory.';
 }
 
 $addErrors = [];
@@ -193,9 +196,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($addErrors)) {
             $qtyVal = (int)$add_quantity;
             $expVal = $add_expiration_date !== '' ? $add_expiration_date : null;
-            $stmt = $conn->prepare("INSERT INTO inventory (item_name, category_id, quantity, unit, expiration_date, last_updated) VALUES (?, ?, ?, ?, ?, NOW())");
+            $statusVal = inventory_status_from_expiration($expVal);
+            if (inventory_status_column_exists($conn)) {
+                $stmt = $conn->prepare("INSERT INTO inventory (item_name, category_id, quantity, unit, expiration_date, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+            } else {
+                $stmt = $conn->prepare("INSERT INTO inventory (item_name, category_id, quantity, unit, expiration_date, last_updated) VALUES (?, ?, ?, ?, ?, NOW())");
+            }
             if ($stmt) {
-                $stmt->bind_param('siiss', $add_item_name, $categoryIdVal, $qtyVal, $add_unit, $expVal);
+                if (inventory_status_column_exists($conn)) {
+                    $stmt->bind_param('siisss', $add_item_name, $categoryIdVal, $qtyVal, $add_unit, $expVal, $statusVal);
+                } else {
+                    $stmt->bind_param('siiss', $add_item_name, $categoryIdVal, $qtyVal, $add_unit, $expVal);
+                }
                 if ($stmt->execute()) {
                     $stmt->close();
                     $catName = find_category_name($categories, $categoryIdVal);
@@ -292,19 +304,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($itemId <= 0) { $distributeErrors[] = 'Invalid item at row ' . ($idx+1) . '.'; continue; }
                 if ($giveQty <= 0) { $distributeErrors[] = 'Quantity must be at least 1 for each item.'; continue; }
 
-                // Check stock
-                $chk = $conn->prepare("SELECT quantity, unit, item_name FROM inventory WHERE inventory_id = ?");
+                // Check stock and status
+                if (inventory_status_column_exists($conn)) {
+                    $chk = $conn->prepare("SELECT quantity, unit, item_name, status FROM inventory WHERE inventory_id = ?");
+                } else {
+                    $chk = $conn->prepare("SELECT quantity, unit, item_name FROM inventory WHERE inventory_id = ?");
+                }
                 if ($chk) {
-                    $chk->bind_param('i', $itemId); $chk->execute();
-                    $chk->bind_result($avail, $unit, $iname);
+                    $chk->bind_param('i', $itemId);
+                    $chk->execute();
+                    if (inventory_status_column_exists($conn)) {
+                        $chk->bind_result($avail, $unit, $iname, $itemStatus);
+                    } else {
+                        $chk->bind_result($avail, $unit, $iname);
+                        $itemStatus = 'Available';
+                    }
                     if ($chk->fetch()) {
-                        if ($giveQty > $avail)
+                        if ($itemStatus === 'Expired') {
+                            $distributeErrors[] = '"' . htmlspecialchars($iname) . '" is expired and cannot be given out.';
+                        } elseif ($giveQty > $avail) {
                             $distributeErrors[] = '"' . htmlspecialchars($iname) . '": only ' . $avail . ' ' . $unit . ' available, but ' . $giveQty . ' requested.';
-                        else
+                        } else {
                             $lines[] = ['inventory_id' => $itemId, 'qty' => $giveQty];
-                    } else { $distributeErrors[] = 'Item ID ' . $itemId . ' not found.'; }
+                        }
+                    } else {
+                        $distributeErrors[] = 'Item ID ' . $itemId . ' not found.';
+                    }
                     $chk->close();
-                } else { $distributeErrors[] = 'Database error checking stock.'; }
+                } else {
+                    $distributeErrors[] = 'Database error checking stock.';
+                }
             }
         }
 
@@ -450,12 +479,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$today = new DateTime('today');
+sync_inventory_statuses($conn);
+
 $inventoryItems = [];
 $hasUncategorized = false;
 $uncategorizedCount = 0;
-$invResult = $conn->query("SELECT i.inventory_id, i.item_name, i.category_id, c.category_name, i.quantity, i.unit, i.expiration_date, i.last_updated FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id ORDER BY i.item_name");
+$invSelect = inventory_select_columns();
+$invResult = $conn->query("SELECT {$invSelect} FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id ORDER BY i.item_name");
 if ($invResult && $invResult->num_rows > 0) {
     while ($row = $invResult->fetch_assoc()) {
+        $row = enrich_inventory_status($row, $today);
         $categoryLabel = $row['category_name'] ?: 'Uncategorized';
         if ($row['category_name'] === null || $row['category_name'] === '') {
             $hasUncategorized = true;
@@ -468,9 +502,10 @@ if ($invResult && $invResult->num_rows > 0) {
 }
 
 $logRows = [];
+$logSeq = 0;
 $logsResult = null;
 if ($inventoryLogRefColumn !== null) {
-    $logsResult = $conn->query("SELECT il.{$inventoryLogRefColumn} AS inventory_ref_id, i.item_name, il.child_id, c.first_name, c.middle_name, c.last_name, c.suffix, c.barangay_id, b.barangay_name AS barangay_name, il.transaction_type, il.quantity, il.transaction_date, il.remarks
+    $logsResult = $conn->query("SELECT il.{$inventoryLogRefColumn} AS inventory_ref_id, i.item_name, il.child_id, c.first_name, c.middle_name, c.last_name, c.suffix, c.barangay_id, b.barangay_name AS barangay_name, il.transaction_type, il.quantity, il.transaction_date, il.remarks AS notes
         FROM inventory_logs il
         LEFT JOIN inventory i ON il.{$inventoryLogRefColumn} = i.inventory_id
         LEFT JOIN children c ON il.child_id = c.child_id
@@ -479,6 +514,7 @@ if ($inventoryLogRefColumn !== null) {
 if ($logsResult && $logsResult->num_rows > 0) {
     while ($log = $logsResult->fetch_assoc()) {
         $log['barangay'] = $log['barangay_name'] ?? '';
+        $log['seq'] = $logSeq++;
         $logRows[] = $log;
     }
 }
@@ -524,9 +560,10 @@ if ($giveOutTypeId !== null) {
                 'transaction_type' => 'GIVE OUT (INTERVENTION)',
                 'quantity' => $row['quantity'] ?? 0,
                 'transaction_date' => ($row['intervention_date'] ?? '') !== ''
-                    ? $row['intervention_date'] . ' 00:00:00'
+                    ? $row['intervention_date']
                     : null,
-                'remarks' => $row['description'] ?? '',
+                'notes' => $row['description'] ?? '',
+                'seq' => $logSeq++,
             ];
         }
         $stmtGiveOutLogs->close();
@@ -536,7 +573,10 @@ if ($giveOutTypeId !== null) {
 usort($logRows, static function ($a, $b) {
     $aTime = isset($a['transaction_date']) ? strtotime((string)$a['transaction_date']) : 0;
     $bTime = isset($b['transaction_date']) ? strtotime((string)$b['transaction_date']) : 0;
-    return $bTime <=> $aTime;
+    if ($aTime !== $bTime) return $bTime <=> $aTime;
+    $aSeq = isset($a['seq']) ? (int)$a['seq'] : 0;
+    $bSeq = isset($b['seq']) ? (int)$b['seq'] : 0;
+    return $bSeq <=> $aSeq;
 });
 
 $logRows = array_slice($logRows, 0, 100);
@@ -553,6 +593,48 @@ foreach ($logRows as $log) {
 }
 if (!empty($logMonths)) {
     krsort($logMonths);
+}
+
+// AJAX endpoint to return distribution history rows HTML for live refresh
+if (isset($_GET['action']) && $_GET['action'] === 'dist_rows_ajax') {
+    $rowsHtml = '';
+    if (!empty($logRows)) {
+        ob_start();
+        foreach ($logRows as $log) {
+            $txDate = $log['transaction_date'] ? date('M d, Y', strtotime($log['transaction_date'])) : '—';
+            $txMonth = $log['transaction_date'] ? date('Y-m', strtotime($log['transaction_date'])) : '';
+            $txYear = $log['transaction_date'] ? date('Y', strtotime($log['transaction_date'])) : '';
+            $n = trim(($log['first_name']??'').' '.($log['middle_name']??'').' '.($log['last_name']??''));
+            if (!empty($log['suffix'])) $n .= ' '.$log['suffix'];
+            $childLabel = $log['child_id']!==null ? ($n?:'Child #'.(int)$log['child_id']) : '—';
+            $notesText = (string)($log['notes'] ?? $log['remarks'] ?? '');
+            $searchText = strtolower(trim(($log['item_name'] ?? '') . ' ' . $childLabel . ' ' . ($log['barangay'] ?? '') . ' ' . $notesText));
+            ?>
+            <tr data-month="<?= htmlspecialchars($txMonth) ?>" data-year="<?= htmlspecialchars($txYear) ?>" data-barangay="<?= htmlspecialchars($log['barangay'] ?? '') ?>" data-item="<?= htmlspecialchars($log['item_name'] ?? '') ?>" data-search="<?= htmlspecialchars($searchText) ?>">
+                <td data-label="Item" style="font-weight:600;color:#111827;"><?= htmlspecialchars($log['item_name']??'—') ?></td>
+                <td data-label="Child" style="color:#374151;"><?= htmlspecialchars($childLabel) ?></td>
+                <td data-label="Barangay" style="color:#374151;"><?= htmlspecialchars($log['barangay'] ?? '—') ?></td>
+                <td data-label="Qty" style="text-align:center;"><span class="badge badge-blue"><?= htmlspecialchars($log['quantity']) ?></span></td>
+                <td data-label="Date" style="font-size:0.82rem;color:#374151;"><?= $txDate ?></td>
+                <td data-label="Notes" class="notes-col hide-mobile" style="font-size:0.82rem;color:#6b7280;font-style:<?= empty($notesText)?'italic':'normal' ?>;"><?= htmlspecialchars($notesText !== '' ? $notesText : '—') ?></td>
+            </tr>
+            <?php
+        }
+        $rowsHtml = ob_get_clean();
+    } else {
+        ob_start();
+        ?>
+        <tr><td colspan="6" class="empty-cell">
+            <div class="empty-state">
+                <div class="empty-icon">📜</div>
+                <h3>No distributions yet</h3>
+                <p>When you give out items, they will appear here.</p>
+            </div>
+        </td></tr>
+        <?php
+        $rowsHtml = ob_get_clean();
+    }
+    inventory_json_exit(['success' => true, 'html' => $rowsHtml]);
 }
 
 // Build unique barangays, years, and item names for filters
@@ -581,7 +663,6 @@ $totalItems = count($inventoryItems);
 $lowStock = 0; $expiringSoon = 0; $totalStock = 0; 
 $expiredUnique = 0; $expiredTotalUnits = 0;
 $maxQty = 1;
-$today = new DateTime();
 foreach ($inventoryItems as $item) {
     $qty = (int)$item['quantity'];
     $totalStock += $qty;
@@ -950,7 +1031,6 @@ if ($stmtCat) {
                     <th>Barangay</th>
                     <th class="center">Qty Given</th>
                     <th>Date</th>
-                    <th>Time</th>
                     <th class="notes-col hide-mobile">Notes</th>
                 </tr>
             </thead>
@@ -964,7 +1044,8 @@ if ($stmtCat) {
                     $n = trim(($log['first_name']??'').' '.($log['middle_name']??'').' '.($log['last_name']??''));
                     if (!empty($log['suffix'])) $n .= ' '.$log['suffix'];
                     $childLabel = $log['child_id']!==null ? ($n?:'Child #'.(int)$log['child_id']) : '—';
-                        $searchText = strtolower(trim(($log['item_name'] ?? '') . ' ' . $childLabel . ' ' . ($log['barangay'] ?? '') . ' ' . ($log['remarks'] ?? '')));
+                        $notesText = (string)($log['notes'] ?? $log['remarks'] ?? '');
+                        $searchText = strtolower(trim(($log['item_name'] ?? '') . ' ' . $childLabel . ' ' . ($log['barangay'] ?? '') . ' ' . $notesText));
             ?>
                     <tr data-month="<?= htmlspecialchars($txMonth) ?>" data-year="<?= htmlspecialchars($txYear) ?>" data-barangay="<?= htmlspecialchars($log['barangay'] ?? '') ?>" data-item="<?= htmlspecialchars($log['item_name'] ?? '') ?>" data-search="<?= htmlspecialchars($searchText) ?>">
                 <td data-label="Item" style="font-weight:600;color:#111827;"><?= htmlspecialchars($log['item_name']??'—') ?></td>
@@ -972,13 +1053,12 @@ if ($stmtCat) {
                 <td data-label="Barangay" style="color:#374151;"><?= htmlspecialchars($log['barangay'] ?? '—') ?></td>
                 <td data-label="Qty" style="text-align:center;"><span class="badge badge-blue"><?= htmlspecialchars($log['quantity']) ?></span></td>
                 <td data-label="Date" style="font-size:0.82rem;color:#374151;"><?= $txDate ?></td>
-                <td data-label="Time" style="font-size:0.82rem;color:#6b7280;"><?= $txTime ?></td>
-                <td data-label="Notes" class="notes-col hide-mobile" style="font-size:0.82rem;color:#6b7280;font-style:<?= empty($log['remarks'])?'italic':'normal' ?>;"><?= htmlspecialchars($log['remarks']??'—') ?></td>
+                    <td data-label="Notes" class="notes-col hide-mobile" style="font-size:0.82rem;color:#6b7280;font-style:<?= empty($notesText)?'italic':'normal' ?>;"><?= htmlspecialchars($notesText !== '' ? $notesText : '—') ?></td>
             </tr>
             <?php endforeach;
             ?>
             <tr id="distNoResults" style="display:none;">
-                <td colspan="7" class="empty-cell">
+                <td colspan="6" class="empty-cell">
                     <div class="empty-state">
                         <div class="empty-icon">📅</div>
                         <h3>No records for that month</h3>
@@ -988,7 +1068,7 @@ if ($stmtCat) {
             </tr>
             <?php
             else: ?>
-            <tr><td colspan="7" class="empty-cell">
+            <tr><td colspan="6" class="empty-cell">
                 <div class="empty-state">
                     <div class="empty-icon">📜</div>
                     <h3>No distributions yet</h3>
@@ -1207,6 +1287,7 @@ if ($stmtCat) {
                             <option value="">— Select an item —</option>
                             <?php foreach ($inventoryItems as $item):
                                 if ((int)$item['quantity'] <= 0) continue;
+                                if (($item['status'] ?? 'Available') !== 'Available') continue;
                             ?>
                             <option value="<?= (int)$item['inventory_id'] ?>"
                                 data-name="<?= htmlspecialchars($item['item_name'],ENT_QUOTES) ?>"
