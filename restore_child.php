@@ -2,6 +2,13 @@
 session_start();
 require_once __DIR__ . '/access_control.php';
 enforce_page_access();
+
+// Staff are read-only — they cannot restore child profiles
+if (($_SESSION['role'] ?? '') === 'Staff') {
+    header('Location: archive_children.php?error=access');
+    exit;
+}
+
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/activity_logger.php';
 

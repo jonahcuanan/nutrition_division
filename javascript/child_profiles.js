@@ -256,7 +256,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('edit_sex').value = d.sex || 'Male';
                         document.getElementById('edit_address').value = d.address || '';
                         document.getElementById('edit_g_first').value = d.guardian_first || '';
+                        document.getElementById('edit_g_middle').value = d.guardian_middle || '';
                         document.getElementById('edit_g_last').value = d.guardian_last || '';
+                        document.getElementById('edit_g_suffix').value = d.guardian_suffix || '';
                         document.getElementById('edit_ip').value = d.is_ip || 'No';
 
                         const editBarangaySelect = document.getElementById('edit_barangay_id');
@@ -433,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const inputs = [
             'edit_first_name', 'edit_middle_name', 'edit_last_name', 'edit_suffix',
             'edit_birthdate', 'edit_sex', 'edit_address', 'edit_barangay_id',
-            'edit_designated_user_id', 'edit_g_first', 'edit_g_last', 'edit_ip',
+            'edit_designated_user_id', 'edit_g_first', 'edit_g_middle', 'edit_g_last', 'edit_g_suffix', 'edit_ip',
             'measurement_date', 'height', 'weight', 'muac'
         ];
         const snapshot = {};

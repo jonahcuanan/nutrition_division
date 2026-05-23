@@ -153,6 +153,11 @@ if ($childId <= 0) {
         $childResult = $childStmt->get_result();
         if ($childResult && $row = $childResult->fetch_assoc()) {
             $child = $row;
+            // Enforce barangay-level access for HW and BNS
+            if (!verify_child_barangay_access($conn, $childId)) {
+                header('Location: child_profiles.php?error=access_denied');
+                exit;
+            }
         } else {
             $errorMessage = 'Child not found.';
         }
@@ -256,7 +261,7 @@ if ($childId <= 0) {
                    FROM growth_records gr
                    JOIN users u ON gr.recorded_by = u.user_id
                    WHERE gr.child_id = ?
-                   ORDER BY gr.measurement_date ASC, gr.record_id ASC
+                   ORDER BY gr.measurement_date DESC, gr.record_id DESC
                    LIMIT 1";
         $bnsStmt = $conn->prepare($bnsSql);
         if ($bnsStmt) {
@@ -356,6 +361,9 @@ $latestRecord = $records ? $records[0] : null;
     <link rel="stylesheet" href="css/view_child_profile.css">
     <link rel="stylesheet" href="css/growth-status.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<?php include 'sidebar.php'; ?>
 <main class="main-content">
 
     <!-- PAGE HEADER -->

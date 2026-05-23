@@ -10,6 +10,7 @@ $assignedBarangayId = isset($_SESSION['barangay_id']) ? (int)$_SESSION['barangay
 
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/growth_utils.php';
+require_once __DIR__ . '/activity_logger.php';
 require_once __DIR__ . '/vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -23,9 +24,18 @@ use PhpOffice\PhpSpreadsheet\Style\Protection;
 $childIdsInput = $_POST['child_ids'] ?? $_GET['child_ids'] ?? '';
 $childIds = array_filter(array_map('intval', explode(',', $childIdsInput)));
 
+// Security filter: BNS, HW, and Staff can only export child profiles they have access to
+$childIds = array_filter($childIds, function($id) use ($conn) {
+    return verify_child_barangay_access($conn, $id);
+});
+
 if (empty($childIds)) {
-    die("No valid children selected for export.");
+    die("No valid children selected or access denied.");
 }
+
+// Log activity transaction
+log_user_activity($conn, $currentUserId, 'export_excel', 'Exported ' . count($childIds) . ' child profiles to Excel.');
+
 
 // 2. Determine Cutoff Period Logic (clear measurement logic)
 $sessionFile = __DIR__ . '/measurement_session.txt';

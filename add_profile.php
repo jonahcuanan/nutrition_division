@@ -3,8 +3,16 @@ session_start();
 require_once __DIR__ . '/access_control.php';
 enforce_page_access();
 $current_role = $_SESSION['role'] ?? '';
+
+// Staff are read-only — they cannot register new children
+if ($current_role === 'Staff') {
+    header('Location: child_profiles.php');
+    exit;
+}
+
 $assigned_barangay_id = isset($_SESSION['barangay_id']) ? (int)$_SESSION['barangay_id'] : null;
 $limit_barangay = in_array($current_role, ['Barangay Nutrition Scholars', 'Health Worker'], true);
+
 
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/growth_utils.php';

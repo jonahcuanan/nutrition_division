@@ -45,8 +45,12 @@ $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 $stmt->close();
 
+if ($user && ($user['status'] ?? '') !== 'Active') {
+	header('Location: index.php?error=' . urlencode('Your account is inactive. Please contact the admin.'));
+	exit;
+}
 
-if ($user && $user['status'] === 'Active') {
+if ($user) {
 	$matchedPassword = null;
 	foreach ($passwordCandidates as $candidate) {
 		if (password_verify($candidate, $user['password'])) {
@@ -92,6 +96,6 @@ if ($user && $user['status'] === 'Active') {
 	}
 }
 
-header('Location: index.php?error=' . urlencode('Invalid credentials or inactive account.'));
+header('Location: index.php?error=' . urlencode('Invalid user ID or password.'));
 exit;
 

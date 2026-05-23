@@ -928,3 +928,117 @@ document.addEventListener('submit', async function (e) {
         }
     }
 });
+
+// ── Custom Status Toggle Confirmation Modal & AJAX update ──
+(function() {
+    let activeStatusForm = null;
+
+    window.confirmToggleStatus = function(event, form) {
+        if (event) event.preventDefault();
+        activeStatusForm = form;
+
+        const newStatus = form.querySelector('input[name="new_status"]').value;
+        const titleEl = document.getElementById('confirmStatusTitle');
+        const iconEl = document.getElementById('confirmStatusIcon');
+        const textEl = document.getElementById('confirmStatusText');
+        const btnEl = document.getElementById('confirmStatusSubmitBtn');
+
+        if (newStatus === 'Inactive') {
+            titleEl.textContent = 'Deactivate User Account';
+            iconEl.textContent = '🛑';
+            textEl.textContent = 'Are you sure you want to set this account to Inactive? This user will no longer be able to log in.';
+            btnEl.className = 'btn btn-danger';
+            btnEl.textContent = 'Yes, Deactivate';
+        } else {
+            titleEl.textContent = 'Activate User Account';
+            iconEl.textContent = '✅';
+            textEl.textContent = 'Are you sure you want to set this account to Active?';
+            btnEl.className = 'btn btn-success';
+            btnEl.textContent = 'Yes, Activate';
+        }
+
+        const modal = document.getElementById('confirmStatusModal');
+        if (modal) {
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+    };
+
+    window.closeConfirmStatusModal = function() {
+        const modal = document.getElementById('confirmStatusModal');
+        if (modal) {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        activeStatusForm = null;
+    };
+
+    const initSubmitBtn = () => {
+        const submitBtn = document.getElementById('confirmStatusSubmitBtn');
+        if (submitBtn && !submitBtn.dataset.bound) {
+            submitBtn.dataset.bound = "true";
+            submitBtn.addEventListener('click', async () => {
+                if (!activeStatusForm) return;
+
+                const form = activeStatusForm;
+                window.closeConfirmStatusModal();
+
+                const btn = submitBtn;
+                const origHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="btn-spinner"></span> Updating...';
+
+                try {
+                    const fd = new FormData(form);
+                    fd.append('_ajax', '1');
+
+                    const res = await fetch(window.location.href, {
+                        method: 'POST',
+                        body: fd,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    const json = await res.json();
+
+                    if (json.success) {
+                        // Refresh the table silently
+                        const refreshRes = await fetch(window.location.href);
+                        const refreshText = await refreshRes.text();
+                        const doc = new DOMParser().parseFromString(refreshText, 'text/html');
+                        const currentMain = document.querySelector('.main-content');
+                        const newMain = doc.querySelector('.main-content');
+                        if (currentMain && newMain) {
+                            currentMain.innerHTML = newMain.innerHTML;
+                        }
+
+                        // Show success toast/alert
+                        showToast('success', json.message);
+
+                        // Re-init general controls & binds
+                        initAccountSettings();
+
+                        // Update sidebar counters if function exists
+                        if (typeof window.updateSidebarCounters === 'function') {
+                            window.updateSidebarCounters();
+                        } else if (typeof updateSidebarCounters === 'function') {
+                            updateSidebarCounters();
+                        }
+                    } else {
+                        showToast('error', json.message || 'Unable to toggle user status.');
+                    }
+                } catch (err) {
+                    console.error('Toggle status error:', err);
+                    showToast('error', 'Network error. Please try again.');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            });
+        }
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSubmitBtn);
+    } else {
+        initSubmitBtn();
+    }
+})();

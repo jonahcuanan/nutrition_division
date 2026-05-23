@@ -95,6 +95,64 @@ function set_flash($type, $message) {
     $_SESSION['flash'] = ['type' => $type, 'message' => $message];
 }
 
+function get_type_row_payload(mysqli $conn, int $typeId, bool $hasDateColumn): array {
+    $selectDateField = $hasDateColumn ? 'i.intervention_date' : "'' AS intervention_date";
+    $sql = "SELECT i.description, {$selectDateField}, t.type_name, c.child_id
+            FROM interventions i
+            INNER JOIN children c ON c.child_id = i.child_id AND c.status = 'Active'
+            LEFT JOIN intervention_types t ON t.type_id = i.type_id
+            WHERE i.type_id = ?
+            ORDER BY i.intervention_date DESC, i.intervention_id DESC";
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return [];
+    }
+    $stmt->bind_param('i', $typeId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $typeName = '';
+    $description = '';
+    $date = '';
+    $childIds = [];
+
+    // Get type name even if no interventions exist yet
+    if ($result->num_rows === 0) {
+        $stmtType = $conn->prepare("SELECT type_name FROM intervention_types WHERE type_id = ?");
+        if ($stmtType) {
+            $stmtType->bind_param('i', $typeId);
+            $stmtType->execute();
+            $stmtType->bind_result($typeName);
+            $stmtType->fetch();
+            $stmtType->close();
+        }
+    }
+
+    $isFirst = true;
+    while ($row = $result->fetch_assoc()) {
+        if ($isFirst) {
+            $typeName = $row['type_name'] ?? '';
+            $description = $row['description'] ?? '';
+            $date = $row['intervention_date'] ?? '';
+            $isFirst = false;
+        }
+        $cid = (int)$row['child_id'];
+        if ($cid > 0 && !in_array($cid, $childIds, true)) {
+            $childIds[] = $cid;
+        }
+    }
+    $stmt->close();
+
+    return [
+        'type_id' => $typeId,
+        'type_name' => $typeName,
+        'description' => $description,
+        'intervention_date' => $date,
+        'child_count' => count($childIds),
+        'child_ids' => $childIds,
+    ];
+}
+
 function normalize_type_name(string $value): string
 {
     $normalized = preg_replace('/\s+/', ' ', trim(strtolower($value)));
@@ -454,6 +512,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($stmtInsert) {
                         $stmtInsert->bind_param('s', $typeName);
                         $stmtInsert->execute();
+                        $newTypeId = (int)$conn->insert_id;
                         $stmtInsert->close();
                         log_user_activity(
                             $conn,
@@ -461,7 +520,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'intervention_type_add',
                             'Added intervention type: ' . $typeName
                         );
-                        $newTypeId = (int)$conn->insert_id;
                         if ($isAjaxRequest) {
                             $ajaxMessage = 'Intervention type added successfully.';
                             $ajaxPayload = [
@@ -633,9 +691,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($mergeTarget) {
             // Only adopt from merge target if user left it blank
-            if ($description === '') {
-                $description = $mergeTarget['description'];
-            }
             if ($hasDateColumn && $interventionDate === '') {
                 $interventionDate = $mergeTarget['intervention_date'];
             }
@@ -835,13 +890,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $viewKey = base64_encode($typeId . '::' . ($description ?? '') . '::' . ($hasDateColumn ? ($interventionDate ?? '') : ''));
                         $ajaxPayload = [
                             'action' => 'add_intervention',
-                            'type_id' => $typeId,
-                            'type_name' => $typeName ?? '',
-                            'child_count' => $inserted,
-                            'child_ids' => $childIds,
-                            'description' => $description ?? '',
-                            'intervention_date' => $hasDateColumn ? ($interventionDate ?? '') : '',
-                            'view_url' => $mergeTarget ? ('view_interventions.php?k=' . urlencode($viewKey)) : '',
+                            'row_payload' => get_type_row_payload($conn, $typeId, $hasDateColumn),
                         ];
                     } else {
                         set_flash('success', $successText);
@@ -1002,12 +1051,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $ajaxMessage = $successText;
                         $ajaxPayload = [
                             'action' => 'edit_intervention',
-                            'type_id' => $typeId,
-                            'original_type_id' => $originalTypeId,
-                            'type_name' => $typeName ?? '',
-                            'child_count' => $inserted,
-                            'description' => $description ?? '',
-                            'intervention_date' => $hasDateColumn ? ($interventionDate ?? '') : '',
+                            'row_payload' => get_type_row_payload($conn, $typeId, $hasDateColumn),
+                            'original_row_payload' => ($typeId !== $originalTypeId) ? get_type_row_payload($conn, $originalTypeId, $hasDateColumn) : null,
                         ];
                     } else {
                         set_flash('success', $successText);

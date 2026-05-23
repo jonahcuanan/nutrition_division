@@ -10,6 +10,13 @@ if ($isArchiveChildAction) {
     require_once __DIR__ . '/activity_logger.php';
     header('Content-Type: application/json');
 
+    // Staff are read-only — block all write operations
+    if (($_SESSION['role'] ?? '') === 'Staff') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Staff accounts cannot archive records.']);
+        exit;
+    }
+
     $childId = isset($_POST['child_id']) ? (int)$_POST['child_id'] : 0;
     $archiveStatus = isset($_POST['status']) ? trim((string)$_POST['status']) : '';
     $statusDate = isset($_POST['status_date']) ? trim((string)$_POST['status_date']) : '';
@@ -88,6 +95,12 @@ if ($isArchiveChildAction) {
         } catch (Exception $e) {
             // ignore parse errors; proceed
         }
+    }
+
+    // Enforce barangay-level ownership before archiving
+    if (!verify_child_barangay_access($conn, $childId)) {
+        echo json_encode(['success' => false, 'message' => 'Access denied.']);
+        exit;
     }
 
     $stmt = $conn->prepare('UPDATE children SET status = ?, status_date = ? WHERE child_id = ?');
@@ -179,7 +192,7 @@ $hasWhereCount = false;
 if ($isBns) {
     $countQuery .= " WHERE EXISTS (SELECT 1 FROM growth_records grb WHERE grb.child_id = c.child_id AND grb.recorded_by = " . (int)$currentUserId . ")";
     $hasWhereCount = true;
-} elseif ($isHw && $assignedBarangayId > 0) {
+} elseif (in_array($currentRole, ['Health Worker', 'Staff'], true) && $assignedBarangayId > 0) {
     $countQuery .= " WHERE c.barangay_id = " . (int)$assignedBarangayId;
     $hasWhereCount = true;
 }
@@ -210,7 +223,7 @@ if ($tab !== 'all') {
 
 if ($isBns) {
     $sql .= " AND EXISTS (SELECT 1 FROM growth_records grb WHERE grb.child_id = c.child_id AND grb.recorded_by = " . (int)$currentUserId . ")";
-} elseif ($isHw && $assignedBarangayId > 0) {
+} elseif (in_array($currentRole, ['Health Worker', 'Staff'], true) && $assignedBarangayId > 0) {
     $sql .= " AND c.barangay_id = " . (int)$assignedBarangayId;
 }
 
@@ -497,7 +510,7 @@ sort($uniqueBarangays);
                         <div class="flex items-center justify-center gap-1.5">
                             <a href="view_child_profile.php?child_id=<?= (int)$row['child_id'] ?>"
                                class="inline-flex rounded-md bg-emerald-600 px-2.5 py-1 text-[0.72rem] text-white font-semibold hover:bg-emerald-700">View</a>
-                            <?php if ($row['status'] === 'Archive'): ?>
+                            <?php if ($row['status'] === 'Archive' && $currentRole !== 'Staff'): ?>
                             <button type="button" 
                                     class="btn-restore inline-flex rounded-md bg-blue-600 px-2.5 py-1 text-[0.72rem] text-white font-semibold hover:bg-blue-700"
                                     data-child-id="<?= (int)$row['child_id'] ?>"

@@ -7,6 +7,7 @@ $currentRole = $_SESSION['role'] ?? '';
 $isBns = ($currentRole === 'Barangay Nutrition Scholars');
 $isAdmin = ($currentRole === 'Admin');
 $isHw = ($currentRole === 'Health Worker');
+$isStaff = ($currentRole === 'Staff');
 $assignedBarangayId = isset($_SESSION['barangay_id']) ? (int)$_SESSION['barangay_id'] : 0;
 $highlightChildId = isset($_GET['child_id']) ? (int)$_GET['child_id'] : 0;
 $highlightRequested = isset($_GET['highlight']) && $_GET['highlight'] === '1';
@@ -166,8 +167,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_child_profile') {
         exit;
     }
 
-    $sqlProfile = "SELECT c.child_id, c.first_name, c.last_name, c.birthdate, c.sex, c.address, c.is_ip, c.barangay_id,
-                      g.first_name AS guardian_first, g.last_name AS guardian_last,
+    // Enforce barangay-level access: HW and BNS may only load children they own
+    if (!verify_child_barangay_access($conn, $childId)) {
+        echo json_encode(['success' => false, 'message' => 'Access denied.']);
+        exit;
+    }
+
+    $sqlProfile = "SELECT c.child_id, c.first_name, c.middle_name, c.last_name, c.suffix, c.birthdate, c.sex, c.address, c.is_ip, c.barangay_id,
+                      g.first_name AS guardian_first, g.middle_name AS guardian_middle, g.last_name AS guardian_last, g.suffix AS guardian_suffix,
                       gr.record_id, gr.measurement_date, gr.weight, gr.height,
                       gr.muac_measurement, gr.muac_id,
                       gr.weight_id, gr.height_id, gr.wfl_id, gr.recorded_by,
@@ -394,19 +401,31 @@ $bindTypes = "";
 
 // Role-based restrictions
 if ($isBns) {
-    $whereClauses[] = "EXISTS (SELECT 1 FROM growth_records grb WHERE grb.child_id = c.child_id AND grb.recorded_by = ?)";
+    $whereClauses[] = "(
+        SELECT grb.recorded_by FROM growth_records grb
+        JOIN users u ON grb.recorded_by = u.user_id
+        WHERE grb.child_id = c.child_id AND u.role = 'Barangay Nutrition Scholars'
+        ORDER BY grb.measurement_date DESC, grb.record_id DESC
+        LIMIT 1
+    ) IS NULL OR (
+        SELECT grb.recorded_by FROM growth_records grb
+        JOIN users u ON grb.recorded_by = u.user_id
+        WHERE grb.child_id = c.child_id AND u.role = 'Barangay Nutrition Scholars'
+        ORDER BY grb.measurement_date DESC, grb.record_id DESC
+        LIMIT 1
+    ) = ?";
     $bindParams[] = $currentUserId;
     $bindTypes .= "i";
 }
 
 // Barangay filters (clamped by role permissions if not admin)
 if ($getBarangayId > 0) {
-    $targetBrgyId = (($isBns || $isHw) && $assignedBarangayId > 0) ? $assignedBarangayId : $getBarangayId;
+    $targetBrgyId = (($isBns || $isHw || $isStaff) && $assignedBarangayId > 0) ? $assignedBarangayId : $getBarangayId;
     $whereClauses[] = "c.barangay_id = ?";
     $bindParams[] = $targetBrgyId;
     $bindTypes .= "i";
 } elseif ($getBarangayName !== '') {
-    if (!$isBns && !$isHw) {
+    if (!$isBns && !$isHw && !$isStaff) {
         $whereClauses[] = "LOWER(b.barangay_name) = LOWER(?)";
         $bindParams[] = $getBarangayName;
         $bindTypes .= "s";
@@ -415,7 +434,7 @@ if ($getBarangayId > 0) {
         $bindParams[] = $assignedBarangayId;
         $bindTypes .= "i";
     }
-} elseif (($isBns || $isHw) && $assignedBarangayId > 0) {
+} elseif (($isBns || $isHw || $isStaff) && $assignedBarangayId > 0) {
     $whereClauses[] = "c.barangay_id = ?";
     $bindParams[] = $assignedBarangayId;
     $bindTypes .= "i";
@@ -607,7 +626,7 @@ if ($barangaysQuery) {
         $barangaysList[] = $b;
     }
 }
-$limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health Worker'], true);
+$limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health Worker', 'Staff'], true);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -683,7 +702,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                 Export Excel
             </button>
-            <?php if (!$isBns && !$isHw): ?>
+            <?php if ($isAdmin): ?>
             <?php 
                 $disableNewPeriod = ($cutoffRecordId > 0 && $unmeasuredCount > 0);
             ?>
@@ -1240,6 +1259,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                                     <svg class="shrink-0 opacity-90" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
                                     View
                                 </a>
+                                <?php if (!$isStaff): ?>
                                 <button type="button" class="btn-open-update flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[0.78rem] font-semibold text-blue-700 hover:bg-blue-50" data-child-id="<?= (int)$row['child_id'] ?>" data-mode="measurement">
                                     <svg class="shrink-0 opacity-90" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/><path d="M14.06 6.19l1.77-1.77a1.5 1.5 0 1 1 2.12 2.12l-1.77 1.77"/></svg>
                                     Update Measurement
@@ -1258,6 +1278,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                                     <svg class="shrink-0 opacity-90" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
                                     Archive
                                 </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </td>
@@ -1316,8 +1337,16 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                                 <input type="text" name="first_name" id="edit_first_name" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
                             <div class="flex flex-col gap-1 text-[0.78rem]">
+                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Middle Name</label>
+                                <input type="text" name="middle_name" id="edit_middle_name" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
+                            </div>
+                            <div class="flex flex-col gap-1 text-[0.78rem]">
                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Last Name</label>
                                 <input type="text" name="last_name" id="edit_last_name" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
+                            </div>
+                            <div class="flex flex-col gap-1 text-[0.78rem]">
+                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Suffix (e.g. JR, III)</label>
+                                <input type="text" name="suffix" id="edit_suffix" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
                             <div class="flex flex-col gap-1 text-[0.78rem]">
                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Date of Birth</label>
@@ -1364,8 +1393,16 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                                 <input type="text" name="guardian_first_name" id="edit_g_first" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
                             <div class="flex flex-col gap-1 text-[0.78rem]">
+                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Mother/Caregiver Middle</label>
+                                <input type="text" name="guardian_middle_name" id="edit_g_middle" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
+                            </div>
+                            <div class="flex flex-col gap-1 text-[0.78rem]">
                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Mother/Caregiver Last</label>
                                 <input type="text" name="guardian_last_name" id="edit_g_last" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
+                            </div>
+                            <div class="flex flex-col gap-1 text-[0.78rem]">
+                                <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">Mother/Caregiver Suffix</label>
+                                <input type="text" name="guardian_suffix" id="edit_g_suffix" class="w-full rounded-md border border-slate-300 px-3 py-1.5 text-[0.82rem] text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-100" />
                             </div>
                             <div class="flex flex-col gap-1 text-[0.78rem]">
                                 <label class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">

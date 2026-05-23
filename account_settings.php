@@ -143,8 +143,8 @@ if ($sessionUserId > 0) {
     }
 }
 
-// Redirect non-admins away from activity logs or users account tabs
-if (!$isAdmin && isset($_GET['tab']) && in_array($_GET['tab'], ['activity_logs', 'users_account'])) {
+// Redirect non-admins away from users account tab (non-admins can access activity logs)
+if (!$isAdmin && isset($_GET['tab']) && $_GET['tab'] === 'users_account') {
     header('Location: account_settings.php');
     exit;
 }
@@ -524,13 +524,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_user'])) {
     }
 }
 
+// Handle user status toggle (Admins only)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_user_status'])) {
+    if (!$isAdmin) {
+        $errorMessage = 'You do not have permission to update user status.';
+    } else {
+        $targetUserId = (int)($_POST['target_user_id'] ?? 0);
+        $newStatus = trim((string)($_POST['new_status'] ?? ''));
+        $allowedStatuses = ['Active', 'Inactive'];
+
+        if ($targetUserId <= 0) {
+            $errorMessage = 'Invalid user ID.';
+        } elseif (!in_array($newStatus, $allowedStatuses, true)) {
+            $errorMessage = 'Invalid status value.';
+        } else {
+            $checkStmt = $conn->prepare("SELECT role FROM users WHERE user_id = ? LIMIT 1");
+            if ($checkStmt) {
+                $targetRole = '';
+                $checkStmt->bind_param('i', $targetUserId);
+                $checkStmt->execute();
+                $checkStmt->bind_result($targetRole);
+                $found = $checkStmt->fetch();
+                $checkStmt->close();
+
+                if (!$found) {
+                    $errorMessage = 'User not found.';
+                } elseif ($targetRole === 'Admin') {
+                    $errorMessage = 'Admin account status cannot be changed from this page.';
+                } else {
+                    $updateStmt = $conn->prepare('UPDATE users SET status = ? WHERE user_id = ? LIMIT 1');
+                    if ($updateStmt) {
+                        $updateStmt->bind_param('si', $newStatus, $targetUserId);
+                        if ($updateStmt->execute()) {
+                            $successMessage = 'User account status updated to ' . $newStatus . '.';
+                            log_user_activity($conn, $sessionUserId, 'user_status_change', "Set user {$targetUserId} status to {$newStatus}.");
+                        } else {
+                            $errorMessage = 'Failed to update user account status.';
+                        }
+                        $updateStmt->close();
+                    } else {
+                        $errorMessage = 'Database error while updating user status.';
+                    }
+                }
+            } else {
+                $errorMessage = 'Database error while validating user status update.';
+            }
+        }
+    }
+
+    if (isset($_POST['_ajax']) || isset($_POST['ajax'])) {
+        header('Content-Type: application/json');
+        if (isset($successMessage)) {
+            echo json_encode(['success' => true, 'message' => $successMessage]);
+        } else {
+            echo json_encode(['success' => false, 'message' => $errorMessage ?: 'Unknown error occurred.']);
+        }
+        exit;
+    }
+}
+
 // Fetch activity logs
 $activityLogResult = null;
 if (isset($_GET['tab']) && $_GET['tab'] === 'activity_logs') {
     $sql = "SELECT l.id, l.user_id, u.first_name, u.middle_name, u.last_name, u.role, l.activity_type, l.details, l.activity_time
             FROM user_activity_log l
-            LEFT JOIN users u ON l.user_id = u.user_id
-            ORDER BY l.activity_time DESC";
+            LEFT JOIN users u ON l.user_id = u.user_id";
+    
+    if (!$isAdmin) {
+        $userBarangayId = isset($_SESSION['barangay_id']) ? (int)$_SESSION['barangay_id'] : 0;
+        if ($userBarangayId > 0) {
+            $sql .= " WHERE u.barangay_id = $userBarangayId OR l.user_id = $sessionUserId";
+        } else {
+            $sql .= " WHERE l.user_id = $sessionUserId";
+        }
+    }
+    
+    $sql .= " ORDER BY l.activity_time DESC";
     $activityLogResult = $conn->query($sql);
 }
 
@@ -538,12 +607,14 @@ if (isset($_GET['tab']) && $_GET['tab'] === 'activity_logs') {
 $userAccountRows = [];
 $totalUsers = 0;
 if (isset($_GET['tab']) && $_GET['tab'] === 'users_account') {
-    $result = $conn->query("SELECT u.user_id, u.first_name, u.middle_name, u.last_name, u.suffix, u.role, u.contact_number, u.email, u.barangay_id, b.barangay_name FROM users u LEFT JOIN barangays b ON u.barangay_id = b.barangay_id WHERE u.role != 'Admin' ORDER BY u.last_name ASC, u.first_name ASC");
+    $result = $conn->query("SELECT u.user_id, u.first_name, u.middle_name, u.last_name, u.suffix, u.role, u.contact_number, u.email, u.status, u.barangay_id, b.barangay_name FROM users u LEFT JOIN barangays b ON u.barangay_id = b.barangay_id WHERE u.role != 'Admin' ORDER BY u.last_name ASC, u.first_name ASC");
     if ($result) {
         while ($row = $result->fetch_assoc()) {
             $userAccountRows[] = $row;
+            if (($row['status'] ?? '') === 'Active') {
+                $totalUsers++;
+            }
         }
-        $totalUsers = count($userAccountRows);
     }
 }
 
@@ -596,11 +667,9 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
             👥 Users Account
         </a>
         <?php endif; ?>
-        <?php if ($isAdmin): ?>
-            <a href="account_settings.php?tab=activity_logs" class="<?= $isLogsTab ? 'active' : '' ?>">
-                📋 Activity Logs
-            </a>
-        <?php endif; ?>
+        <a href="account_settings.php?tab=activity_logs" class="<?= $isLogsTab ? 'active' : '' ?>">
+            📋 Activity Logs
+        </a>
     </nav>
 
     <?php if ($isLogsTab): ?>
@@ -716,6 +785,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                     'barangay_delete'       => ['label' => 'Deleted Barangay',         'icon' => '🗑️',  'bg' => '#fee2e2', 'color' => '#991b1b'],
                                     'archive_child'         => ['label' => 'Archived Child Profile',  'icon' => '🗂️', 'bg' => '#ffe4e6', 'color' => '#9f1239'],
                                     'restore_child'         => ['label' => 'Restored Child Profile',  'icon' => '♻️', 'bg' => '#dcfce7', 'color' => '#166534'],
+                                    'export_excel'          => ['label' => 'Exported Excel',          'icon' => '📊', 'bg' => '#ecfdf5', 'color' => '#047857'],
                                 ];
                                 if ($actKey === 'update_measurement') {
                                     $badge = ['label' => 'Updated Measurement', 'icon' => '📏', 'bg' => '#dbeafe', 'color' => '#1d4ed8'];
@@ -814,6 +884,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                             <th>Assigned Barangay</th>
                             <th>Contact Number</th>
                             <th>Email Address</th>
+                            <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -834,6 +905,9 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                 if ($barangayUnassigned) $barangayName = 'Unassigned';
                                 $contactNumber = trim($row['contact_number'] ?? '');
                                 $email = trim($row['email'] ?? '');
+                                $status = ($row['status'] ?? 'Active') === 'Inactive' ? 'Inactive' : 'Active';
+                                $isActive = ($status === 'Active');
+                                $nextStatus = $isActive ? 'Inactive' : 'Active';
 
                                 $roleRaw = $row['role'] ?? '';
                                 // Display acronyms for long role names
@@ -844,7 +918,7 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                     $roleDisplay = 'HW';
                                 }
                             ?>
-                            <tr data-role="<?= htmlspecialchars($roleRaw) ?>" data-barangay="<?= htmlspecialchars($barangayName) ?>">
+                            <tr data-role="<?= htmlspecialchars($roleRaw) ?>" data-barangay="<?= htmlspecialchars($barangayName) ?>" data-status="<?= htmlspecialchars($status) ?>">
                                 <td><span class="ua-username"><?= htmlspecialchars(str_pad((string)$row['user_id'], 6, '0', STR_PAD_LEFT)) ?></span></td>
                                 <td><?= htmlspecialchars($fullName) ?></td>
                                 <td title="<?= htmlspecialchars($roleRaw) ?>"><?= htmlspecialchars($roleDisplay) ?></td>
@@ -858,26 +932,39 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                                 <td class="ua-contact"><?= $contactNumber !== '' ? htmlspecialchars($contactNumber) : '<span class="ua-dash">&mdash;</span>' ?></td>
                                 <td class="ua-email"><?= $email !== '' ? htmlspecialchars($email) : '<span class="ua-dash">&mdash;</span>' ?></td>
                                 <td>
-                                    <button class="btn btn-edit-user" onclick="openEditUserModal({
-                                        user_id: <?= (int)$row['user_id'] ?>,
-                                        first_name: <?= htmlspecialchars(json_encode($row['first_name'] ?? '')) ?>,
-                                        middle_name: <?= htmlspecialchars(json_encode($row['middle_name'] ?? '')) ?>,
-                                        last_name: <?= htmlspecialchars(json_encode($row['last_name'] ?? '')) ?>,
-                                        suffix: <?= htmlspecialchars(json_encode($row['suffix'] ?? '')) ?>,
-                                        contact_number: <?= htmlspecialchars(json_encode($row['contact_number'] ?? '')) ?>,
-                                        email: <?= htmlspecialchars(json_encode($row['email'] ?? '')) ?>,
-                                        barangay_id: <?= htmlspecialchars(json_encode($row['barangay_id'] ?? '')) ?>,
-                                        role: <?= htmlspecialchars(json_encode($row['role'] ?? '')) ?>
-                                    })">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                        Edit
-                                    </button>
+                                    <span class="ua-status-badge <?= $isActive ? 'status-active' : 'status-inactive' ?>"><?= htmlspecialchars($status) ?></span>
+                                </td>
+                                <td>
+                                    <div class="ua-actions">
+                                        <form method="post" action="" onsubmit="confirmToggleStatus(event, this);">
+                                            <input type="hidden" name="toggle_user_status" value="1">
+                                            <input type="hidden" name="target_user_id" value="<?= (int)$row['user_id'] ?>">
+                                            <input type="hidden" name="new_status" value="<?= htmlspecialchars($nextStatus) ?>">
+                                            <button type="submit" class="btn-status-toggle <?= $isActive ? 'btn-deactivate' : 'btn-activate' ?>">
+                                                <?= $isActive ? 'Deactivate' : 'Activate' ?>
+                                            </button>
+                                        </form>
+                                        <button class="btn btn-edit-user" onclick="openEditUserModal({
+                                            user_id: <?= (int)$row['user_id'] ?>,
+                                            first_name: <?= htmlspecialchars(json_encode($row['first_name'] ?? '')) ?>,
+                                            middle_name: <?= htmlspecialchars(json_encode($row['middle_name'] ?? '')) ?>,
+                                            last_name: <?= htmlspecialchars(json_encode($row['last_name'] ?? '')) ?>,
+                                            suffix: <?= htmlspecialchars(json_encode($row['suffix'] ?? '')) ?>,
+                                            contact_number: <?= htmlspecialchars(json_encode($row['contact_number'] ?? '')) ?>,
+                                            email: <?= htmlspecialchars(json_encode($row['email'] ?? '')) ?>,
+                                            barangay_id: <?= htmlspecialchars(json_encode($row['barangay_id'] ?? '')) ?>,
+                                            role: <?= htmlspecialchars(json_encode($row['role'] ?? '')) ?>
+                                        })">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                            Edit
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6" style="text-align:center; padding: 44px 24px; color: var(--text-faint); font-family: 'Sora', sans-serif; font-size: 0.86rem;">
+                            <td colspan="8" style="text-align:center; padding: 44px 24px; color: var(--text-faint); font-family: 'Sora', sans-serif; font-size: 0.86rem;">
                                 <div style="font-size:2rem; margin-bottom:10px;">👤</div>
                                 No user accounts found.
                             </td>
@@ -1289,6 +1376,27 @@ $isSettingsTab = !$isLogsTab && !$isUsersAccountTab;
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                 Save Changes
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Premium Toggle Status Confirmation Modal -->
+<div class="modal-overlay" id="confirmStatusModal">
+    <div class="modal-backdrop" onclick="closeConfirmStatusModal()"></div>
+    <div class="modal-box" style="max-width: 440px;">
+        <div class="modal-header" style="padding: 18px 24px; border-bottom: 1px solid var(--border);">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span id="confirmStatusIcon" style="font-size: 1.3rem;">⚠️</span>
+                <span class="modal-title" id="confirmStatusTitle" style="font-size: 1.05rem; font-weight: 700; font-family: 'Sora', sans-serif;">Confirm Status Change</span>
+            </div>
+            <button type="button" class="modal-close" onclick="closeConfirmStatusModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 24px; font-size: 0.88rem; line-height: 1.6; color: var(--text); font-family: 'Sora', sans-serif; text-transform: none;">
+            <p id="confirmStatusText" style="margin: 0; font-weight: 500;"></p>
+        </div>
+        <div class="modal-footer" style="padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap:10px;">
+            <button type="button" class="btn btn-outline" style="padding: 9px 16px; font-size: 0.8rem; border-radius: var(--radius-md);" onclick="closeConfirmStatusModal()">Cancel</button>
+            <button type="button" id="confirmStatusSubmitBtn" class="btn" style="padding: 9px 18px; font-size: 0.8rem; border-radius: var(--radius-md);">Yes, Update</button>
         </div>
     </div>
 </div>

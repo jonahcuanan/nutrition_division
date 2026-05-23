@@ -172,72 +172,60 @@ function upsertInterventionRow(payload) {
     const description = payload.description || '';
     const date = payload.intervention_date || '';
     const count = payload.child_count || 0;
+    const childIds = payload.child_ids || [];
 
-    let row = tableBody.querySelector(`tr[data-type-id="${typeId}"][data-description="${description}"][data-date="${date}"]`);
+    // Remove empty state row if it exists
+    const emptyState = tableBody.querySelector('.empty-state');
+    if (emptyState) {
+        const tr = emptyState.closest('tr');
+        if (tr) tr.remove();
+    }
+
+    let row = tableBody.querySelector(`tr[data-type-id="${typeId}"]`);
     if (!row) {
-        // Also check for the "empty placeholder" row for this type if it exists
-        const placeholder = tableBody.querySelector(`tr[data-type-id="${typeId}"][data-description=""][data-date=""]`);
-        if (placeholder && !placeholder.querySelector('[data-child-count]')?.textContent.includes('children')) {
-            placeholder.remove();
-        }
-
         row = document.createElement('tr');
         row.className = 'intervention-row';
         row.setAttribute('data-type-id', typeId);
-        row.setAttribute('data-type-name', typeName);
-        row.setAttribute('data-description', description);
-        row.setAttribute('data-date', date);
-        row.setAttribute('data-child-ids', JSON.stringify(payload.child_ids || []));
-        row.innerHTML = `
-            <td class="type-cell">
-                <span class="type-badge">${escHtmlText(typeName)}</span>
-            </td>
-            <td>
-                <span class="child-count-badge" data-child-count>
-                    ${count} child${count !== 1 ? 'ren' : ''}
-                </span>
-            </td>
-            <td style="text-align:center;">
-                <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
-                    <a href="${buildViewLink(typeId, description, date)}" class="tbl-btn-view btn-view-page" style="background:#059669 !important; border-color:#059669 !important; box-shadow:0 4px 12px rgba(5,150,105,.22) !important;">
-                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                        View
-                    </a>
-                    <form method="POST" class="js-delete-type-form" style="display:inline-flex;">
-                        <input type="hidden" name="action" value="delete_type">
-                        <input type="hidden" name="type_id" value="${escHtmlText(typeId)}">
-                        <button type="button" class="tbl-btn-delete js-open-delete-type-modal" 
-                            data-type-name="${escHtmlText(typeName)}"
-                            style="display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:8px;border:1px solid #fecaca;background:#fff1f2;color:#b91c1c;font-size:11px;font-weight:700;line-height:1;cursor:pointer;">
-                            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-                            Delete
-                        </button>
-                    </form>
-                </div>
-            </td>
-        `;
         tableBody.appendChild(row);
-    } else {
-        const viewLink = row.querySelector('.btn-view-page');
-        if (viewLink) {
-            // Prefer server-supplied view URL when available (merge target case)
-            if (payload && payload.view_url) {
-                viewLink.href = payload.view_url;
-            } else {
-                viewLink.href = buildViewLink(typeId, description, date);
-            }
-            // Ensure consistent green styling for dynamically inserted links
-            viewLink.style.background = '#059669';
-            viewLink.style.borderColor = '#059669';
-            viewLink.style.boxShadow = '0 4px 12px rgba(5,150,105,.22)';
-        }
-        const badge = row.querySelector('.type-badge');
-        if (badge) badge.textContent = typeName;
-        row.setAttribute('data-type-name', typeName);
     }
 
-    const countEl = row.querySelector('[data-child-count]');
-    updateChildCountDisplay(countEl, count);
+    row.setAttribute('data-type-name', typeName);
+    row.setAttribute('data-description', description);
+    row.setAttribute('data-date', date);
+    row.setAttribute('data-child-ids', JSON.stringify(childIds));
+
+    const viewLinkHref = buildViewLink(typeId, description, date);
+    const hasAssignedChildren = count > 0;
+
+    row.innerHTML = `
+        <td class="type-cell">
+            <span class="type-badge">${escHtmlText(typeName)}</span>
+        </td>
+        <td>
+            <span class="child-count-badge" data-child-count>
+                ${count} child${count !== 1 ? 'ren' : ''}
+            </span>
+        </td>
+        <td style="text-align:center;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
+                <a href="${viewLinkHref}" class="tbl-btn-view btn-view-page" style="background:#059669 !important; border-color:#059669 !important; box-shadow:0 4px 12px rgba(5,150,105,.22) !important;">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                    View
+                </a>
+                <form method="POST" class="js-delete-type-form" style="display:inline-flex;">
+                    <input type="hidden" name="action" value="delete_type">
+                    <input type="hidden" name="type_id" value="${escHtmlText(typeId)}">
+                    <button type="button" class="tbl-btn-delete js-open-delete-type-modal" 
+                        data-type-name="${escHtmlText(typeName)}"
+                        ${hasAssignedChildren ? 'disabled title="Cannot delete because this type has child intervention records."' : ''}
+                        style="display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:8px;border:1px solid #fecaca;background:#fff1f2;color:#b91c1c;font-size:11px;font-weight:700;line-height:1;cursor:${hasAssignedChildren ? 'not-allowed' : 'pointer'};opacity:${hasAssignedChildren ? '0.55' : '1'};">
+                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                        Delete
+                    </button>
+                </form>
+            </div>
+        </td>
+    `;
 }
 
 /* ── Type Name Duplicate Detection ── */
@@ -291,6 +279,14 @@ if (typeForm) {
                         existingTypes.push(name.toLowerCase());
                         addTypeToSelect(payload.type_id, name);
                         addTypeToList(name);
+
+                        // Auto-select the newly added type in the modal select and trigger its change listener
+                        const selectEl = document.getElementById('type_id_modal');
+                        if (selectEl) {
+                            selectEl.value = String(payload.type_id);
+                            selectEl.dispatchEvent(new Event('change'));
+                        }
+
                         upsertInterventionRow({
                             type_id: payload.type_id,
                             type_name: name,
@@ -850,10 +846,37 @@ function submitInterventionAjax() {
         .then(json => {
             if (json && json.success) {
                 const payload = json.payload || {};
-                if (payload.type_id) {
-                    upsertInterventionRow(payload);
-                        if (typeof window.refreshDistHistory === 'function') window.refreshDistHistory();
+
+                // 1. Deduct items from the dropdown options if this was a Give Out intervention
+                const selectedType = parseInt(document.getElementById('type_id_modal')?.value || '0', 10);
+                if (selectedType === giveOutTypeId && Object.keys(giveOutCart).length > 0 && giveOutItemSelect) {
+                    Object.keys(giveOutCart).forEach(id => {
+                        const cartItem = giveOutCart[id];
+                        const option = giveOutItemSelect.querySelector(`option[value="${id}"]`);
+                        if (option) {
+                            const currentMax = parseInt(option.dataset.max || '0', 10);
+                            const nextMax = currentMax - cartItem.qty;
+                            if (nextMax <= 0) {
+                                option.remove();
+                            } else {
+                                option.dataset.max = nextMax;
+                                option.textContent = `${cartItem.name} (${nextMax} ${cartItem.unit} available)`;
+                            }
+                        }
+                    });
                 }
+
+                // 2. Update/upsert the intervention table rows
+                if (payload.row_payload) {
+                    upsertInterventionRow(payload.row_payload);
+                } else if (payload.type_id) {
+                    upsertInterventionRow(payload);
+                }
+                if (payload.original_row_payload) {
+                    upsertInterventionRow(payload.original_row_payload);
+                }
+
+                if (typeof window.refreshDistHistory === 'function') window.refreshDistHistory();
                 showToast('success', json.message || 'Intervention saved successfully.');
                 closeModal('interventionModal');
                 resetInterventionFormState();

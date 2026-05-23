@@ -14,6 +14,13 @@ require_once __DIR__ . '/activity_logger.php';
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Staff are read-only — block all write operations
+    if (($_SESSION['role'] ?? '') === 'Staff') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Staff accounts cannot modify records.']);
+        exit;
+    }
+
     $update_mode      = isset($_POST['update_mode']) ? $_POST['update_mode'] : 'both';
     $record_id        = isset($_POST['record_id']) ? intval($_POST['record_id']) : null;
     $child_id         = isset($_POST['child_id']) ? intval($_POST['child_id']) : null;
@@ -28,8 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // 1) Get child + guardian details from children table
-    $childSql = "SELECT c.birthdate, c.sex, c.guardian_id, c.first_name, c.middle_name, c.last_name, c.address, c.is_ip,
-                g.first_name AS guardian_first, g.last_name AS guardian_last
+    $childSql = "SELECT c.birthdate, c.sex, c.guardian_id, c.first_name, c.middle_name, c.last_name, c.suffix, c.address, c.is_ip,
+                g.first_name AS guardian_first, g.middle_name AS guardian_middle, g.last_name AS guardian_last, g.suffix AS guardian_suffix
              FROM children c
              LEFT JOIN guardians g ON c.guardian_id = g.guardian_id
              WHERE c.child_id = ?
@@ -49,39 +56,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $childStmt->close();
 
+    // Enforce barangay-level ownership: HW and BNS may only modify children they own
+    if (!verify_child_barangay_access($conn, $child_id)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Access denied.']);
+        exit;
+    }
+
     $originalChild = $childRow;
 
     // Handle profile updates if mode is 'profile' or 'both'
     $profileUpdated = false;
     if ($update_mode === 'profile' || $update_mode === 'both') {
         $upd_first_name = isset($_POST['first_name']) ? strtoupper(trim($_POST['first_name'])) : null;
+        $upd_middle_name = isset($_POST['middle_name']) ? strtoupper(trim($_POST['middle_name'])) : '';
         $upd_last_name  = isset($_POST['last_name']) ? strtoupper(trim($_POST['last_name'])) : null;
+        $upd_suffix      = isset($_POST['suffix']) ? strtoupper(trim($_POST['suffix'])) : '';
         $upd_address    = isset($_POST['address']) ? strtoupper(trim($_POST['address'])) : null;
         $upd_sex        = isset($_POST['sex']) ? strtoupper(trim($_POST['sex'])) : null;
         $upd_birthdate  = isset($_POST['birthdate']) ? trim($_POST['birthdate']) : null;
         $upd_is_ip      = isset($_POST['is_ip']) ? strtoupper(trim($_POST['is_ip'])) : null;
         
         $upd_g_first    = isset($_POST['guardian_first_name']) ? strtoupper(trim($_POST['guardian_first_name'])) : null;
+        $upd_g_middle   = isset($_POST['guardian_middle_name']) ? strtoupper(trim($_POST['guardian_middle_name'])) : '';
         $upd_g_last     = isset($_POST['guardian_last_name']) ? strtoupper(trim($_POST['guardian_last_name'])) : null;
+        $upd_g_suffix   = isset($_POST['guardian_suffix']) ? strtoupper(trim($_POST['guardian_suffix'])) : '';
 
         $upd_barangay_id = isset($_POST['barangay_id']) ? (int)$_POST['barangay_id'] : null;
         $upd_designated_user_id = isset($_POST['designated_user_id']) ? (int)$_POST['designated_user_id'] : null;
 
         if ($upd_first_name && $upd_last_name) {
             if ($upd_barangay_id > 0) {
-                $updChildSql = "UPDATE children SET first_name=?, last_name=?, address=?, sex=?, birthdate=?, is_ip=?, barangay_id=? WHERE child_id=?";
+                $updChildSql = "UPDATE children SET first_name=?, middle_name=?, last_name=?, suffix=?, address=?, sex=?, birthdate=?, is_ip=?, barangay_id=? WHERE child_id=?";
                 $updChildStmt = $conn->prepare($updChildSql);
                 if ($updChildStmt) {
-                    $updChildStmt->bind_param('ssssssii', $upd_first_name, $upd_last_name, $upd_address, $upd_sex, $upd_birthdate, $upd_is_ip, $upd_barangay_id, $child_id);
+                    $updChildStmt->bind_param('ssssssssii', $upd_first_name, $upd_middle_name, $upd_last_name, $upd_suffix, $upd_address, $upd_sex, $upd_birthdate, $upd_is_ip, $upd_barangay_id, $child_id);
                     $updChildStmt->execute();
                     $updChildStmt->close();
                     $profileUpdated = true;
                 }
             } else {
-                $updChildSql = "UPDATE children SET first_name=?, last_name=?, address=?, sex=?, birthdate=?, is_ip=? WHERE child_id=?";
+                $updChildSql = "UPDATE children SET first_name=?, middle_name=?, last_name=?, suffix=?, address=?, sex=?, birthdate=?, is_ip=? WHERE child_id=?";
                 $updChildStmt = $conn->prepare($updChildSql);
                 if ($updChildStmt) {
-                    $updChildStmt->bind_param('ssssssi', $upd_first_name, $upd_last_name, $upd_address, $upd_sex, $upd_birthdate, $upd_is_ip, $child_id);
+                    $updChildStmt->bind_param('sssssssi', $upd_first_name, $upd_middle_name, $upd_last_name, $upd_suffix, $upd_address, $upd_sex, $upd_birthdate, $upd_is_ip, $child_id);
                     $updChildStmt->execute();
                     $updChildStmt->close();
                     $profileUpdated = true;
@@ -114,10 +132,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($upd_g_first && $upd_g_last && $childRow['guardian_id']) {
-            $updGuardSql = "UPDATE guardians SET first_name=?, last_name=? WHERE guardian_id=?";
+            $updGuardSql = "UPDATE guardians SET first_name=?, middle_name=?, last_name=?, suffix=? WHERE guardian_id=?";
             $updGuardStmt = $conn->prepare($updGuardSql);
             if ($updGuardStmt) {
-                $updGuardStmt->bind_param('ssi', $upd_g_first, $upd_g_last, $childRow['guardian_id']);
+                $updGuardStmt->bind_param('ssssi', $upd_g_first, $upd_g_middle, $upd_g_last, $upd_g_suffix, $childRow['guardian_id']);
                 $updGuardStmt->execute();
                 $updGuardStmt->close();
                 $profileUpdated = true;
@@ -319,12 +337,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         };
         $compare('First Name', $originalChild['first_name'], $_POST['first_name'] ?? null);
+        $compare('Middle Name', $originalChild['middle_name'], $_POST['middle_name'] ?? null);
         $compare('Last Name', $originalChild['last_name'], $_POST['last_name'] ?? null);
+        $compare('Suffix', $originalChild['suffix'], $_POST['suffix'] ?? null);
         $compare('DOB', $originalChild['birthdate'], $_POST['birthdate'] ?? null);
         $compare('Sex', $originalChild['sex'], $_POST['sex'] ?? null);
         $compare('Address', $originalChild['address'], $_POST['address'] ?? null);
         $compare('Guardian First', $originalChild['guardian_first'], $_POST['guardian_first_name'] ?? null);
+        $compare('Guardian Middle', $originalChild['guardian_middle'], $_POST['guardian_middle_name'] ?? null);
         $compare('Guardian Last', $originalChild['guardian_last'], $_POST['guardian_last_name'] ?? null);
+        $compare('Guardian Suffix', $originalChild['guardian_suffix'], $_POST['guardian_suffix'] ?? null);
         $compare('IP', $originalChild['is_ip'], $_POST['is_ip'] ?? null);
 
         if (!empty($changes)) {

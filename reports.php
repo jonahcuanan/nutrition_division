@@ -1218,9 +1218,17 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                     elseif ($child['wfl_status'] === 'Overweight') $affectedOW_wfl++;
                                     elseif ($child['wfl_status'] === 'Obese') $affectedOb++;
                                 }
-                                $undernutritionTotal = $affectedUW + $affectedSUW + $affectedSt + $affectedSSt + $affectedMW + $affectedSW;
-                                $overweightObeseTotal = $affectedOW_wfa + $affectedOW_wfl + $affectedOb;
-                                $totalAffected = $undernutritionTotal + $overweightObeseTotal;
+                                 $undernutritionTotal = 0;
+                                 $overweightObeseTotal = 0;
+                                 foreach ($reportData['affectedChildren'] as $child) {
+                                     if (in_array($child['wfa_status'], ['Underweight', 'Severely Underweight'], true) || in_array($child['hfa_status'], ['Stunted', 'Severely Stunted'], true) || in_array($child['wfl_status'], ['Wasted', 'Severely Wasted'], true)) {
+                                         $undernutritionTotal++;
+                                     }
+                                     if ($child['wfa_status'] === 'Overweight' || in_array($child['wfl_status'], ['Overweight', 'Obese'], true)) {
+                                         $overweightObeseTotal++;
+                                     }
+                                 }
+                                 $totalAffected = count($reportData['affectedChildren']);
                                 ?>
 
                                 <!-- SUMMARY SECTION -->

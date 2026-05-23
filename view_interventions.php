@@ -16,8 +16,11 @@ function set_flash(string $type, string $message): void
 }
 
 $current_role = $_SESSION['role'] ?? '';
+$current_user_id = (int)($_SESSION['user_id'] ?? 0);
 $is_bns = ($current_role === 'Barangay Nutrition Scholars');
 $is_hw = ($current_role === 'Health Worker');
+$is_staff = ($current_role === 'Staff');
+$assigned_barangay_id = isset($_SESSION['barangay_id']) ? (int)$_SESSION['barangay_id'] : 0;
 
 if (isset($_GET['action']) && $_GET['action'] === 'child_history') {
     header('Content-Type: application/json');
@@ -245,11 +248,44 @@ $sql = "SELECT c.child_id, c.first_name, c.middle_name, c.last_name, c.suffix, c
             ORDER BY gr2.measurement_date DESC, gr2.record_id DESC
             LIMIT 1
         )
-        WHERE i.type_id = ?
-        ORDER BY c.first_name ASC, c.last_name ASC, c.child_id ASC";
+        WHERE i.type_id = ?";
+
+// Restrict HW and Staff to their own barangay; BNS to their barangay AND their currently assigned children
+if (($is_hw || $is_bns || $is_staff) && $assigned_barangay_id > 0) {
+    $sql .= " AND c.barangay_id = ?";
+    if ($is_bns && $current_user_id > 0) {
+        $sql .= " AND (
+            (
+                SELECT grb.recorded_by FROM growth_records grb
+                JOIN users u ON grb.recorded_by = u.user_id
+                WHERE grb.child_id = c.child_id AND u.role = 'Barangay Nutrition Scholars'
+                ORDER BY grb.measurement_date DESC, grb.record_id DESC
+                LIMIT 1
+            ) IS NULL OR (
+                SELECT grb.recorded_by FROM growth_records grb
+                JOIN users u ON grb.recorded_by = u.user_id
+                WHERE grb.child_id = c.child_id AND u.role = 'Barangay Nutrition Scholars'
+                ORDER BY grb.measurement_date DESC, grb.record_id DESC
+                LIMIT 1
+            ) = ?
+        )";
+    }
+}
+$sql .= " ORDER BY c.first_name ASC, c.last_name ASC, c.child_id ASC";
+
 $stmt = $conn->prepare($sql);
 if ($stmt) {
-    $stmt->bind_param('ii', $typeId, $typeId);
+    if (($is_hw || $is_bns || $is_staff) && $assigned_barangay_id > 0) {
+        if ($is_bns && $current_user_id > 0) {
+            // typeId, typeId, barangayId, userId
+            $stmt->bind_param('iiii', $typeId, $typeId, $assigned_barangay_id, $current_user_id);
+        } else {
+            // typeId, typeId, barangayId
+            $stmt->bind_param('iii', $typeId, $typeId, $assigned_barangay_id);
+        }
+    } else {
+        $stmt->bind_param('ii', $typeId, $typeId);
+    }
     $stmt->execute();
     $result = $stmt->get_result();
     while ($r = $result->fetch_assoc()) {
@@ -697,33 +733,33 @@ sort($barangayOptions);
                         <thead>
                             <tr>
                                 <?php if ($isGiveOut): ?>
-                                <th style="width:7%;">Address</th>
-                                <th style="width:7%;">Barangay</th>
-                                <th style="width:9%;">Full Name</th>
-                                <th style="width:3%;">Sex</th>
-                                <th style="width:3%;">Age</th>
-                                <th style="width:8%;">Measurement Date</th>
-                                <th style="width:5%;">Height<br>for Age<br>Status</th>
-                                <th style="width:5%;">Weight<br>for Age<br>Status</th>
-                                <th style="width:5%;">Weight<br>for L/HT<br>Status</th>
-                                <th style="width:5%;">Date</th>
-                                <th style="width:9%;">What Given</th>
-                                <th style="width:3%;">Qty</th>
-                                <th style="width:17%;">Notes</th>
-                                <th style="width:5%;">Action</th>
-                                <?php else: ?>
                                 <th style="width:8%;">Address</th>
                                 <th style="width:8%;">Barangay</th>
                                 <th style="width:10%;">Full Name</th>
                                 <th style="width:3%;">Sex</th>
                                 <th style="width:3%;">Age</th>
-                                <th style="width:10%;">Measurement Date</th>
+                                <th style="width:8%;">Measurement Date</th>
                                 <th style="width:6%;">Height<br>for Age<br>Status</th>
                                 <th style="width:6%;">Weight<br>for Age<br>Status</th>
                                 <th style="width:6%;">Weight<br>for L/HT<br>Status</th>
                                 <th style="width:6%;">Date</th>
-                                <th style="width:16%;">Notes</th>
-                                <th style="width:6%;">Action</th>
+                                <th style="width:11%;">What Given</th>
+                                <th style="width:4%;">Qty</th>
+                                <th style="width:11%;">Notes</th>
+                                <th style="width:10%;">Action</th>
+                                <?php else: ?>
+                                <th style="width:10%;">Address</th>
+                                <th style="width:10%;">Barangay</th>
+                                <th style="width:12%;">Full Name</th>
+                                <th style="width:4%;">Sex</th>
+                                <th style="width:4%;">Age</th>
+                                <th style="width:10%;">Measurement Date</th>
+                                <th style="width:7%;">Height<br>for Age<br>Status</th>
+                                <th style="width:7%;">Weight<br>for Age<br>Status</th>
+                                <th style="width:7%;">Weight<br>for L/HT<br>Status</th>
+                                <th style="width:7%;">Date</th>
+                                <th style="width:12%;">Notes</th>
+                                <th style="width:10%;">Action</th>
                                 <?php endif; ?>
                             </tr>
                         </thead>

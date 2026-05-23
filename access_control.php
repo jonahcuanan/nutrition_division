@@ -39,6 +39,7 @@ function access_non_admin_pages(): array
         'archive_children.php',
         'restore_child.php',
         'archive_child.php',
+        'export_profiles.php',
     ];
 }
 
@@ -110,4 +111,98 @@ function enforce_page_access(array $options = []): void
     }
 
     deny_access($expectsJson);
+}
+
+/**
+ * Verify that the currently logged-in user has permission to access a specific child.
+ *
+ * - Admin / Staff : always allowed.
+ * - Health Worker : child must belong to the user's assigned barangay.
+ * - BNS           : child must belong to the user's assigned barangay AND the user
+ *                   must have recorded at least one growth record for that child.
+ *
+ * @param  mysqli $conn     Active database connection.
+ * @param  int    $childId  The child_id to check.
+ * @return bool   true if access is allowed, false otherwise.
+ */
+function verify_child_barangay_access(mysqli $conn, int $childId): bool
+{
+    $role      = $_SESSION['role']      ?? '';
+    $userId    = (int)($_SESSION['user_id']    ?? 0);
+    $barangayId= (int)($_SESSION['barangay_id'] ?? 0);
+
+    // Admins and Staff have unrestricted access
+    if ($role === ROLE_ADMIN || $role === ROLE_STAFF) {
+        return true;
+    }
+
+    if ($barangayId <= 0) {
+        return false;
+    }
+
+    if ($role === ROLE_HEALTH_WORKER) {
+        $stmt = $conn->prepare(
+            'SELECT 1 FROM children WHERE child_id = ? AND barangay_id = ? LIMIT 1'
+        );
+        if (!$stmt) return false;
+        $stmt->bind_param('ii', $childId, $barangayId);
+        $stmt->execute();
+        $ok = (bool)$stmt->get_result()->num_rows;
+        $stmt->close();
+        return $ok;
+    }
+
+    if ($role === ROLE_BNS) {
+        // 1. Must be in BNS's assigned barangay
+        $stmt = $conn->prepare('SELECT barangay_id, status FROM children WHERE child_id = ? LIMIT 1');
+        if (!$stmt) return false;
+        $stmt->bind_param('i', $childId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $childRow = $res->fetch_assoc();
+        $stmt->close();
+
+        if (!$childRow || (int)$childRow['barangay_id'] !== $barangayId) {
+            return false;
+        }
+
+        // 2. Check growth records to determine assignment
+        // Check if any BNS has ever measured this child
+        $bnsQuery = 'SELECT gr.recorded_by, c.status FROM growth_records gr 
+                     JOIN users u ON gr.recorded_by = u.user_id 
+                     JOIN children c ON gr.child_id = c.child_id
+                     WHERE gr.child_id = ? AND u.role = "Barangay Nutrition Scholars"
+                     ORDER BY gr.measurement_date DESC, gr.record_id DESC';
+        $stmt = $conn->prepare($bnsQuery);
+        if (!$stmt) return false;
+        $stmt->bind_param('i', $childId);
+        $stmt->execute();
+        $recordsRes = $stmt->get_result();
+        $bnsRecords = $recordsRes->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+
+        // Case A: No BNS has ever measured this child yet -> any BNS in that barangay can view and add first measurement
+        if (empty($bnsRecords)) {
+            return true;
+        }
+
+        // Case B: The most recent measurement by a BNS was by this logged-in BNS
+        if ((int)$bnsRecords[0]['recorded_by'] === $userId) {
+            return true;
+        }
+
+        // Case C: For archived/deceased/overage children, if this BNS has recorded ANY record in the past, let them view it
+        $isArchived = in_array($childRow['status'], ['Archive', 'Decease', 'OverAge'], true);
+        if ($isArchived) {
+            foreach ($bnsRecords as $rec) {
+                if ((int)$rec['recorded_by'] === $userId) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    return false;
 }
