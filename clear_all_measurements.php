@@ -69,9 +69,7 @@ if ($cutoffRecordId > 0) {
             SELECT 1 FROM growth_records gr 
             WHERE gr.child_id = c.child_id 
             AND gr.record_id > $cutoffRecordId 
-            AND gr.is_muac_only = FALSE
-            AND COALESCE(gr.weight, 0) > 0
-            AND COALESCE(gr.height, 0) > 0
+            AND (gr.weight > 0 AND gr.height > 0)
         )
     ";
     if ($unmeasuredRes = $conn->query($unmeasuredSql)) {

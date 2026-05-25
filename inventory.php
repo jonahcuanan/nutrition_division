@@ -42,7 +42,7 @@ if (isset($_GET['added']) && $_GET['added'] == '1') {
 
 $addErrors = [];
 $add_item_name = ''; $add_category_id = ''; $add_quantity = '0';
-$add_unit = ''; $add_expiration_date = ''; $add_remarks = 'Initial stock';
+$add_unit = ''; $add_expiration_date = '';
 
 $categoryErrors = [];
 $category_name = '';
@@ -181,7 +181,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $add_quantity        = trim($_POST['quantity'] ?? '0');
         $add_unit            = trim($_POST['unit'] ?? '');
         $add_expiration_date = trim($_POST['expiration_date'] ?? '');
-        $add_remarks         = trim($_POST['remarks'] ?? 'Initial stock');
 
         $categoryIdVal = null;
 
@@ -662,19 +661,29 @@ ksort($itemsForFilter);
 $totalItems = count($inventoryItems);
 $lowStock = 0; $expiringSoon = 0; $totalStock = 0; 
 $expiredUnique = 0; $expiredTotalUnits = 0;
+$expiredIds = [];
+$lowStockIds = [];
+$expiringSoonIds = [];
 $maxQty = 1;
 foreach ($inventoryItems as $item) {
     $qty = (int)$item['quantity'];
     $totalStock += $qty;
     if ($qty > $maxQty) $maxQty = $qty;
-    if ($qty <= 5) $lowStock++;
+    if ($qty <= 5) {
+        $lowStock++;
+        $lowStockIds[] = (int)$item['inventory_id'];
+    }
     if ($item['expiration_date']) {
         $exp = new DateTime($item['expiration_date']);
         $diff = (int)$today->diff($exp)->days;
-        if ($exp > $today && $diff <= 30) $expiringSoon++;
-        if ($exp <= $today) {
+        if ($exp > $today && $diff <= 30) {
+            $expiringSoon++;
+            $expiringSoonIds[] = (int)$item['inventory_id'];
+        }
+        if ($exp < $today) {
             $expiredUnique++;
             $expiredTotalUnits += $qty;
+            $expiredIds[] = (int)$item['inventory_id'];
         }
     }
 }
@@ -868,30 +877,88 @@ if ($stmtCat) {
                 <div class="s-note">Across all <?= $totalItems ?> item</div>
             </div>
         </div>
+        <?php
+        $lowStockHref = '';
+        $lowStockStyle = '';
+        if (count($lowStockIds) === 1) {
+            $lowStockHref = 'inventory_items.php?highlight_id=' . $lowStockIds[0];
+            $lowStockStyle = 'cursor: pointer;';
+        } elseif (count($lowStockIds) > 1) {
+            $lowStockHref = 'low_stock_items.php';
+            $lowStockStyle = 'cursor: pointer;';
+        }
+        ?>
+        <?php if ($lowStockHref !== ''): ?>
+        <a href="<?= $lowStockHref ?>" class="summary-card <?= $lowStock > 0 ? 'warn' : '' ?>" style="<?= $lowStockStyle ?> text-decoration: none; color: inherit;">
+        <?php else: ?>
         <div class="summary-card <?= $lowStock > 0 ? 'warn' : '' ?>">
+        <?php endif; ?>
             <div class="s-icon s-amber">⚠️</div>
             <div>
                 <div class="s-value"><?= $lowStock ?></div>
                 <div class="s-label">Low Stock Items</div>
                 <div class="s-note">5 or fewer units left</div>
             </div>
+        <?php if ($lowStockHref !== ''): ?>
+        </a>
+        <?php else: ?>
         </div>
+        <?php endif; ?>
+
+        <?php
+        $expiringSoonHref = '';
+        $expiringSoonStyle = '';
+        if (count($expiringSoonIds) === 1) {
+            $expiringSoonHref = 'inventory_items.php?highlight_id=' . $expiringSoonIds[0];
+            $expiringSoonStyle = 'cursor: pointer;';
+        } elseif (count($expiringSoonIds) > 1) {
+            $expiringSoonHref = 'expiring_soon_items.php';
+            $expiringSoonStyle = 'cursor: pointer;';
+        }
+        ?>
+        <?php if ($expiringSoonHref !== ''): ?>
+        <a href="<?= $expiringSoonHref ?>" class="summary-card <?= $expiringSoon > 0 ? 'danger' : '' ?>" style="<?= $expiringSoonStyle ?> text-decoration: none; color: inherit;">
+        <?php else: ?>
         <div class="summary-card <?= $expiringSoon > 0 ? 'danger' : '' ?>">
+        <?php endif; ?>
             <div class="s-icon s-red">📅</div>
             <div>
                 <div class="s-value"><?= $expiringSoon ?></div>
                 <div class="s-label">Expiring Soon</div>
                 <div class="s-note">Within the next 30 days</div>
             </div>
+        <?php if ($expiringSoonHref !== ''): ?>
+        </a>
+        <?php else: ?>
         </div>
+        <?php endif; ?>
+        <?php
+        $cardHref = '';
+        $cardStyle = '';
+        if (count($expiredIds) === 1) {
+            $cardHref = 'inventory_items.php?highlight_id=' . $expiredIds[0];
+            $cardStyle = 'cursor: pointer;';
+        } elseif (count($expiredIds) > 1) {
+            $cardHref = 'expired_items.php';
+            $cardStyle = 'cursor: pointer;';
+        }
+        ?>
+        <?php if ($cardHref !== ''): ?>
+        <a href="<?= $cardHref ?>" class="summary-card <?= $expiredUnique > 0 ? 'danger' : '' ?>" style="<?= $cardStyle ?> text-decoration: none; color: inherit;">
+        <?php else: ?>
         <div class="summary-card <?= $expiredUnique > 0 ? 'danger' : '' ?>">
+        <?php endif; ?>
             <div class="s-icon" style="background:linear-gradient(135deg,#b91c1c,#991b1b);color:#fff;">🚫</div>
             <div>
                 <div class="s-value"><?= number_format($expiredUnique) ?></div>
                 <div class="s-label">Expired Items</div>
                 <div class="s-note"><?= number_format($expiredTotalUnits) ?> total units expired</div>
             </div>
+        <?php if ($cardHref !== ''): ?>
+        </a>
+        <?php else: ?>
         </div>
+        <?php endif; ?>
     </div>
 
     <!-- Category List -->
@@ -980,7 +1047,7 @@ if ($stmtCat) {
                 <div class="card-header-icon icon-blue">📜</div>
                 <div>
                     <h2>Distribution History</h2>
-                    <p>Includes Give Out interventions and inventory distributions (last 100 entries)</p>
+                    <p>Includes Give Out interventions</p>
                 </div>
             </div>
             <div class="card-header-actions dist-filter">
@@ -1140,10 +1207,6 @@ if ($stmtCat) {
                         <input type="date" name="expiration_date" value="<?= htmlspecialchars($add_expiration_date) ?>">
                         <span class="field-hint">Leave blank if none</span>
                     </div>
-                </div>
-                <div class="field">
-                    <label>Notes / Remarks</label>
-                    <textarea name="remarks" placeholder="Any additional notes about this item…"><?= htmlspecialchars($add_remarks) ?></textarea>
                 </div>
                 <div class="modal-foot">
                     <button type="button" class="btn btn-outline" id="addModalCancel">Cancel</button>

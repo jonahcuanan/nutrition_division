@@ -756,6 +756,43 @@
     box-shadow: inset 4px 0 0 #2563eb;
     transition: background .2s ease, box-shadow .2s ease;
 }
+
+/* ── 59-month children: paint only specific columns red ── */
+#tableBody tr.row-59mo td[data-label="Address / Location"],
+#tableBody tr.row-59mo td[data-label="Barangay"],
+#tableBody tr.row-59mo td[data-label="Mother / Caregiver"],
+#tableBody tr.row-59mo td[data-label="Full Name of Child"],
+#tableBody tr.row-59mo td[data-label="Full Name of Child"] div,
+#tableBody tr.row-59mo td[data-label="Belongs to IP Group?"],
+#tableBody tr.row-59mo td[data-label="Sex"],
+#tableBody tr.row-59mo td[data-label="Date of Birth"],
+#tableBody tr.row-59mo td[data-label="Date Measured"] {
+    background-color: #fef2f2 !important;
+    border-color: #fca5a5 !important;
+    color: #991b1b !important;
+}
+
+#tableBody tr.row-59mo td.age-months {
+    background-color: #fee2e2 !important;
+    color: #b91c1c !important;
+    font-weight: 700 !important;
+    border-color: #f87171 !important;
+}
+
+#tableBody tr.row-59mo:hover td[data-label="Address / Location"],
+#tableBody tr.row-59mo:hover td[data-label="Barangay"],
+#tableBody tr.row-59mo:hover td[data-label="Mother / Caregiver"],
+#tableBody tr.row-59mo:hover td[data-label="Full Name of Child"],
+#tableBody tr.row-59mo:hover td[data-label="Belongs to IP Group?"],
+#tableBody tr.row-59mo:hover td[data-label="Sex"],
+#tableBody tr.row-59mo:hover td[data-label="Date of Birth"],
+#tableBody tr.row-59mo:hover td[data-label="Date Measured"] {
+    background-color: #fee2e2 !important;
+}
+
+#tableBody tr.row-59mo:hover td.age-months {
+    background-color: #fca5a5 !important;
+}
 body.update-modal-open #sidebar,
 body.update-modal-open .sb-mobile-bar {
     filter: blur(2px);
@@ -795,9 +832,55 @@ body.update-modal-open .sb-mobile-bar {
     position: absolute;
     right: 100%;
     top: 0;
-    margin-right: 0.25rem;
+    margin-right: 0.35rem;
     z-index: 9000;
     min-width: 160px;
+}
+
+/* Last 3 rows: open dropdown UPWARD so it never pushes the table down */
+#tableBody tr:last-child .action-menu,
+#tableBody tr:nth-last-child(2) .action-menu,
+#tableBody tr:nth-last-child(3) .action-menu {
+    top: auto;
+    bottom: 0;
+}
+
+/* Last 3 rows: the triangle connector also flips to align with bottom */
+#tableBody tr:last-child .action-menu::before,
+#tableBody tr:nth-last-child(2) .action-menu::before,
+#tableBody tr:nth-last-child(3) .action-menu::before,
+#tableBody tr:last-child .action-menu::after,
+#tableBody tr:nth-last-child(2) .action-menu::after,
+#tableBody tr:nth-last-child(3) .action-menu::after {
+    top: auto;
+    bottom: 9px;
+}
+
+/* Triangle connector pointing right toward the three-dot button */
+.action-menu::before,
+.action-menu::after {
+    content: '';
+    position: absolute;
+    top: 9px;
+    right: -9px;
+    width: 0;
+    height: 0;
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+    border-left: 9px solid #e2e8f0;
+}
+
+.action-menu::after {
+    right: -8px;
+    top: 10px;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-left: 8px solid #ffffff;
+}
+
+/* Allow the triangle to extend beyond container bounds */
+.relative.inline-flex {
+    overflow: visible;
 }
 
 #toastContainer {

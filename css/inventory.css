@@ -537,6 +537,12 @@ tbody td {
     border: 1px solid var(--slate-300);
 }
 
+.badge-orange {
+    background: #ffedd5;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+}
+
 /* Stock list: only action buttons are interactive */
 .inv-stock-row--available,
 .inv-stock-row--expired {
@@ -1731,4 +1737,27 @@ select:disabled,
 .disabled,
 [disabled] {
     cursor: not-allowed !important;
+}
+
+@keyframes highlight-pulse {
+    0% { background-color: rgba(245, 158, 11, 0.4); }
+    50% { background-color: rgba(245, 158, 11, 0.15); }
+    100% { background-color: rgba(245, 158, 11, 0.4); }
+}
+
+.highlighted-row {
+    animation: highlight-pulse 2s infinite ease-in-out;
+    background-color: rgba(245, 158, 11, 0.2) !important;
+}
+
+@keyframes highlight-pulse-red {
+    0% { background-color: rgba(239, 68, 68, 0.4); }
+    50% { background-color: rgba(239, 68, 68, 0.15); }
+    100% { background-color: rgba(239, 68, 68, 0.4); }
+}
+
+.highlighted-row.inv-stock-row--expired {
+    animation: highlight-pulse-red 2s infinite ease-in-out;
+    background-color: rgba(239, 68, 68, 0.2) !important;
+    border: 2px solid #ef4444 !important;
 }

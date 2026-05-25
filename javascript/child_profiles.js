@@ -309,7 +309,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (inputMuacId) inputMuacId.value = d.muac_id || '';
 
                         // Measurement defaults
-                        inputMeasurementDate.value = document.body.getAttribute('data-server-today');
+                        const serverToday = document.body.getAttribute('data-server-today') || (new Date()).toISOString().slice(0, 10);
+                        inputMeasurementDate.value = serverToday;
+                        if (d.birthdate) {
+                            inputMeasurementDate.min = d.birthdate;
+                            
+                            // Max date: Day before the child's 5th birthday (60 months)
+                            const birth = new Date(d.birthdate);
+                            const fifthBirthday = new Date(birth);
+                            fifthBirthday.setFullYear(fifthBirthday.getFullYear() + 5);
+                            
+                            const lastDay59 = new Date(fifthBirthday);
+                            lastDay59.setDate(lastDay59.getDate() - 1);
+                            
+                            const maxAgeDate = lastDay59.toISOString().slice(0, 10);
+                            inputMeasurementDate.max = (maxAgeDate < serverToday) ? maxAgeDate : serverToday;
+                        } else {
+                            inputMeasurementDate.min = '';
+                            inputMeasurementDate.max = serverToday;
+                        }
 
                         if (mode === 'muac' || mode === 'measurement' || mode === 'both') {
                             // Pre-fill last height/weight for calculation reference
@@ -585,7 +603,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Event Listeners ──
-    inputMeasurementDate.addEventListener('change', calculateAge);
+    inputMeasurementDate.addEventListener('change', () => {
+        const serverToday = document.body.getAttribute('data-server-today') || (new Date()).toISOString().slice(0, 10);
+        const bStr = currentBirthdate;
+        
+        if (inputMeasurementDate.value && bStr) {
+            const b = new Date(bStr);
+            const m = new Date(inputMeasurementDate.value);
+            const today = new Date(serverToday);
+            
+            if (m > today) {
+                showToast('error', 'Measurement date cannot be in the future.');
+                inputMeasurementDate.value = serverToday;
+            } else if (m < b) {
+                showToast('error', 'Measurement date cannot be before birthdate.');
+                inputMeasurementDate.value = serverToday;
+            } else {
+                let months = (m.getFullYear() - b.getFullYear()) * 12 + (m.getMonth() - b.getMonth());
+                if (m.getDate() < b.getDate()) months--;
+                
+                if (months > 59) {
+                    showToast('error', 'The child\'s age at measurement must not exceed 4 years and 11 months (59 months).');
+                    inputMeasurementDate.value = serverToday;
+                }
+            }
+        }
+        calculateAge();
+    });
     inputHeight.addEventListener('input', updateStatusPreview);
     inputWeight.addEventListener('input', updateStatusPreview);
     inputMuac.addEventListener('input', updateStatusPreview);
@@ -729,6 +773,31 @@ document.addEventListener('DOMContentLoaded', () => {
             inputHeight.required = false;
             inputWeight.required = false;
             inputMuac.required = true;
+        }
+
+        if (mode === 'measurement' || mode === 'muac') {
+            const serverToday = document.body.getAttribute('data-server-today') || (new Date()).toISOString().slice(0, 10);
+            const bStr = currentBirthdate;
+            if (inputMeasurementDate.value && bStr) {
+                const b = new Date(bStr);
+                const m = new Date(inputMeasurementDate.value);
+                const today = new Date(serverToday);
+                
+                if (m > today) {
+                    showToast('error', 'Measurement date cannot be in the future.');
+                    return;
+                }
+                if (m < b) {
+                    showToast('error', 'Measurement date cannot be before birthdate.');
+                    return;
+                }
+                let months = (m.getFullYear() - b.getFullYear()) * 12 + (m.getMonth() - b.getMonth());
+                if (m.getDate() < b.getDate()) months--;
+                if (months > 59) {
+                    showToast('error', 'The child\'s age at measurement must not exceed 4 years and 11 months (59 months).');
+                    return;
+                }
+            }
         }
 
         if (!updateForm.checkValidity()) {
@@ -1196,7 +1265,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const serverToday = document.body.getAttribute('data-server-today') || null;
                 try {
                     archiveDateInput.min = archiveBirthdate;
-                    archiveDateInput.max = serverToday || (new Date()).toISOString().slice(0,10);
+                    archiveDateInput.max = serverToday || (new Date()).toISOString().slice(0, 10);
 
                     // default value: threshold if <= today, otherwise today's date
                     const todayStr = archiveDateInput.max;
@@ -1230,7 +1299,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btnArchiveConfirm.disabled = false;
 
             const reason = archiveReason.value;
-            const serverToday = document.body.getAttribute('data-server-today') || (new Date()).toISOString().slice(0,10);
+            const serverToday = document.body.getAttribute('data-server-today') || (new Date()).toISOString().slice(0, 10);
 
             if (reason === 'OverAge') {
                 // ensure we have birthdate; if not, try fetching
@@ -1281,7 +1350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     const th = new Date(bd);
                                     th.setFullYear(th.getFullYear() + 4);
                                     th.setMonth(th.getMonth() + 11);
-                                    archiveThresholdYMD = `${th.getFullYear()}-${String(th.getMonth()+1).padStart(2,'0')}-${String(th.getDate()).padStart(2,'0')}`;
+                                    archiveThresholdYMD = `${th.getFullYear()}-${String(th.getMonth() + 1).padStart(2, '0')}-${String(th.getDate()).padStart(2, '0')}`;
                                 }
                             })
                             .finally(proceedWithValidation)
@@ -1335,7 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Generic validation: date must be present and not in the future
-        const serverToday = document.body.getAttribute('data-server-today') || (new Date()).toISOString().slice(0,10);
+        const serverToday = document.body.getAttribute('data-server-today') || (new Date()).toISOString().slice(0, 10);
         if (!date) {
             archiveError.textContent = 'Please select an archival date.';
             archiveError.classList.remove('hidden');

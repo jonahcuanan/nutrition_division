@@ -22,7 +22,7 @@ $activeRes = $conn->query("SELECT COUNT(*) as cnt FROM children WHERE status = '
 $activeRow = $activeRes->fetch_assoc();
 $totalActive = (int)$activeRow['cnt'];
 
-// Children measured after cutoff (is_muac_only=FALSE, weight>0, height>0)
+// Children measured after cutoff (full measurement: weight > 0 AND height > 0)
 $measuredAfterSql = "
     SELECT COUNT(DISTINCT c.child_id) as cnt
     FROM children c
@@ -31,9 +31,7 @@ $measuredAfterSql = "
         SELECT 1 FROM growth_records gr
         WHERE gr.child_id = c.child_id
         AND gr.record_id > $cutoffRecordId
-        AND gr.is_muac_only = FALSE
-        AND COALESCE(gr.weight, 0) > 0
-        AND COALESCE(gr.height, 0) > 0
+        AND gr.weight > 0 AND gr.height > 0
     )
 ";
 $measuredRes = $conn->query($measuredAfterSql);
@@ -44,19 +42,16 @@ $measuredAfterCutoff = (int)$measuredRow['cnt'];
 $unmeasuredSql = "
     SELECT c.child_id, c.first_name, c.last_name, c.status,
         (SELECT MAX(gr2.record_id) FROM growth_records gr2 WHERE gr2.child_id = c.child_id) as max_record_id,
-        (SELECT MAX(gr3.record_id) FROM growth_records gr3 WHERE gr3.child_id = c.child_id AND gr3.record_id > $cutoffRecordId AND gr3.is_muac_only = FALSE AND COALESCE(gr3.weight,0) > 0 AND COALESCE(gr3.height,0) > 0) as qualifying_record_id,
+        (SELECT MAX(gr3.record_id) FROM growth_records gr3 WHERE gr3.child_id = c.child_id AND gr3.record_id > $cutoffRecordId AND gr3.weight > 0 AND gr3.height > 0) as qualifying_record_id,
         (SELECT gr4.weight FROM growth_records gr4 WHERE gr4.child_id = c.child_id ORDER BY gr4.record_id DESC LIMIT 1) as latest_weight,
-        (SELECT gr5.height FROM growth_records gr5 WHERE gr5.child_id = c.child_id ORDER BY gr5.record_id DESC LIMIT 1) as latest_height,
-        (SELECT gr6.is_muac_only FROM growth_records gr6 WHERE gr6.child_id = c.child_id ORDER BY gr6.record_id DESC LIMIT 1) as latest_is_muac_only
+        (SELECT gr5.height FROM growth_records gr5 WHERE gr5.child_id = c.child_id ORDER BY gr5.record_id DESC LIMIT 1) as latest_height
     FROM children c
     WHERE c.status = 'Active'
     AND NOT EXISTS (
         SELECT 1 FROM growth_records gr
         WHERE gr.child_id = c.child_id
         AND gr.record_id > $cutoffRecordId
-        AND gr.is_muac_only = FALSE
-        AND COALESCE(gr.weight, 0) > 0
-        AND COALESCE(gr.height, 0) > 0
+        AND gr.weight > 0 AND gr.height > 0
     )
     ORDER BY c.last_name, c.first_name
 ";

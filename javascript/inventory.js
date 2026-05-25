@@ -9,12 +9,15 @@
     const editModal = document.getElementById('editItemModal');
     const deleteItemModal = document.getElementById('deleteItemModal');
     const deleteCategoryModal = document.getElementById('deleteCategoryModal');
+    const zeroExpiredStockModal = document.getElementById('zeroExpiredStockModal');
     const editItemNameText = document.getElementById('editItemName');
     const editCurrentExpirationText = document.getElementById('editCurrentExpiration');
     const deleteItemNameText = document.getElementById('deleteItemNameText');
     const deleteCategoryNameText = document.getElementById('deleteCategoryNameText');
+    const zeroExpiredStockNameText = document.getElementById('zeroExpiredStockNameText');
     let pendingDeleteItemForm = null;
     let pendingDeleteCategoryForm = null;
+    let pendingZeroExpiredStockForm = null;
 
     const openAddBtn = document.getElementById('openAddModalBtn');
     if (openAddBtn && addModal) {
@@ -93,6 +96,22 @@
                     deleteItemNameText.textContent = 'Item: ' + itemName;
                 }
                 openModal(deleteItemModal);
+                return;
+            }
+
+            const zeroTrigger = target.closest('.js-open-zero-expired-modal');
+            if (zeroTrigger instanceof HTMLElement) {
+                if (zeroTrigger.hasAttribute('disabled')) return;
+
+                const form = zeroTrigger.closest('form.js-zero-expired-form');
+                if (!(form instanceof HTMLFormElement)) return;
+
+                pendingZeroExpiredStockForm = form;
+                const itemName = zeroTrigger.getAttribute('data-item-name') || 'this item';
+                if (zeroExpiredStockNameText) {
+                    zeroExpiredStockNameText.textContent = itemName;
+                }
+                openModal(zeroExpiredStockModal);
             }
         });
     }
@@ -197,6 +216,42 @@
         });
     }
 
+    const zeroExpiredStockClose = document.getElementById('zeroExpiredStockClose');
+    if (zeroExpiredStockClose && zeroExpiredStockModal) {
+        zeroExpiredStockClose.addEventListener('click', () => {
+            closeModal(zeroExpiredStockModal);
+            pendingZeroExpiredStockForm = null;
+        });
+    }
+    const zeroExpiredStockCancel = document.getElementById('zeroExpiredStockCancel');
+    if (zeroExpiredStockCancel && zeroExpiredStockModal) {
+        zeroExpiredStockCancel.addEventListener('click', () => {
+            closeModal(zeroExpiredStockModal);
+            pendingZeroExpiredStockForm = null;
+        });
+    }
+    const zeroExpiredStockBackdrop = document.getElementById('zeroExpiredStockBackdrop');
+    if (zeroExpiredStockBackdrop && zeroExpiredStockModal) {
+        zeroExpiredStockBackdrop.addEventListener('click', () => {
+            closeModal(zeroExpiredStockModal);
+            pendingZeroExpiredStockForm = null;
+        });
+    }
+    const zeroExpiredStockConfirmBtn = document.getElementById('zeroExpiredStockConfirmBtn');
+    if (zeroExpiredStockConfirmBtn) {
+        zeroExpiredStockConfirmBtn.addEventListener('click', () => {
+            if (!pendingZeroExpiredStockForm) return;
+            const formToSubmit = pendingZeroExpiredStockForm;
+            pendingZeroExpiredStockForm = null;
+            closeModal(zeroExpiredStockModal);
+            if (typeof formToSubmit.requestSubmit === 'function') {
+                formToSubmit.requestSubmit();
+            } else {
+                formToSubmit.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+        });
+    }
+
     const distModalClose = document.getElementById('distModalClose');
     if (distModalClose && distModal) distModalClose.addEventListener('click', () => { closeModal(distModal); clearCart(); });
     const distModalCancel = document.getElementById('distModalCancel');
@@ -213,8 +268,10 @@
         if (editModal) closeModal(editModal);
         if (deleteItemModal) closeModal(deleteItemModal);
         if (deleteCategoryModal) closeModal(deleteCategoryModal);
+        if (zeroExpiredStockModal) closeModal(zeroExpiredStockModal);
         pendingDeleteItemForm = null;
         pendingDeleteCategoryForm = null;
+        pendingZeroExpiredStockForm = null;
         clearCart();
     });
 
@@ -491,16 +548,6 @@
                 e.preventDefault();
             }
             return;
-        }
-
-        if (form.classList.contains('js-zero-expired-form')) {
-            const btn = form.querySelector('.btn-zero-expired-stock');
-            const name = btn && btn.dataset.itemName ? btn.dataset.itemName : 'this item';
-            if (!window.confirm(
-                'Set stock for "' + name + '" to zero?\n\nThe item stays in the system for past intervention records, but it will no longer appear for new give-outs.'
-            )) {
-                e.preventDefault();
-            }
         }
     });
 

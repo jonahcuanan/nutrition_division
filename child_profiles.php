@@ -1062,8 +1062,8 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Weight (kg)</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Height (cm)</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle age-months">Age (months)</th>
-                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Height for Age Status</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Weight for Age Status</th>
+                    <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Height for Age Status</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">Weight for L/HT Status</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">MUAC (cm)</th>
                     <th class="border border-slate-300 bg-black px-2 py-1.5 text-center align-middle">MUAC Status</th>
@@ -1175,6 +1175,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                     $muacStatus = $row['latest_muac_status'] ?? '—';
                     $muacShort = status_abbrev($muacStatus);
                 ?>
+                <?php $is59 = ((int)$ageMonthsDisplay === 59); ?>
                 <tr
                     data-child-id="<?= (int)$row['child_id'] ?>"
                     data-name="<?= strtolower(htmlspecialchars($childFullName)) ?>"
@@ -1195,7 +1196,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                     data-hfa="<?= strtolower(htmlspecialchars($hfaStatus)) ?>"
                     data-wflh="<?= strtolower(htmlspecialchars($wflStatus)) ?>"
                     data-muac="<?= strtolower(htmlspecialchars($muacStatus)) ?>"
-                    class="hover:bg-slate-50"
+                    class="hover:bg-slate-50 <?= $is59 ? 'row-59mo' : '' ?>"
                 >
                     <td class="border border-slate-300 px-2 py-1.5 align-middle text-slate-700" data-label="Address / Location">
                         <?= htmlspecialchars($addressDisplay) ?>
@@ -1231,14 +1232,14 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                     <td class="border border-slate-300 px-2 py-1.5 align-middle text-center font-bold <?= status_cell_class($hfaStatus) === 'status-severe' ? 'status-severe' : '' ?>" data-label="Height (cm)">
                         <?= htmlspecialchars($heightDisplay) ?>
                     </td>
-                    <td class="border border-slate-300 px-2 py-1.5 align-middle text-center text-slate-700 font-semibold age-months" data-label="Age (months)">
+                    <td class="border border-slate-300 px-2 py-1.5 align-middle text-center age-months" data-label="Age (months)">
                         <?= htmlspecialchars((string)$ageMonthsDisplay) ?>
-                    </td>
-                    <td class="border border-slate-300 px-2 py-1.5 align-middle text-center font-semibold <?= status_cell_class($hfaStatus) ?>" title="<?= htmlspecialchars($hfaStatus) ?>" data-label="Height for Age Status">
-                        <?= htmlspecialchars($hfaShort) ?>
                     </td>
                     <td class="border border-slate-300 px-2 py-1.5 align-middle text-center font-semibold <?= status_cell_class($wfaStatus) ?>" title="<?= htmlspecialchars($wfaStatus) ?>" data-label="Weight for Age Status">
                         <?= htmlspecialchars($wfaShort) ?>
+                    </td>
+                    <td class="border border-slate-300 px-2 py-1.5 align-middle text-center font-semibold <?= status_cell_class($hfaStatus) ?>" title="<?= htmlspecialchars($hfaStatus) ?>" data-label="Height for Age Status">
+                        <?= htmlspecialchars($hfaShort) ?>
                     </td>
                     <td class="border border-slate-300 px-2 py-1.5 align-middle text-center font-semibold <?= status_cell_class($wflStatus) ?>" title="<?= htmlspecialchars($wflStatus) ?>" data-label="Weight for L/HT Status">
                         <?= htmlspecialchars($wflhShort) ?>
@@ -1442,7 +1443,7 @@ $limit_barangay = in_array($currentRole, ['Barangay Nutrition Scholars', 'Health
                     </div>
                     <div id="muacUpdateContainer" class="flex flex-col gap-1 text-[0.78rem]">
                         <label for="muac" class="text-[0.65rem] font-bold uppercase tracking-wide text-slate-500">MUAC (cm)</label>
-                        <input type="number" step="0.1" min="0" name="muac_measurement" id="muac" placeholder="e.g. 12.5" class="w-full rounded-md border border-slate-300 px-3 py-2 text-[0.85rem] font-bold text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-shadow" />
+                        <input type="number" step="0.1" min="0.1" name="muac_measurement" id="muac" placeholder="e.g. 12.5" class="w-full rounded-md border border-slate-300 px-3 py-2 text-[0.85rem] font-bold text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-shadow" />
                     </div>
                     </div>
                 </div>

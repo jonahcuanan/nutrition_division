@@ -1638,8 +1638,8 @@ function child_label(array $child): string {
                             <h3 style="font-size: 14px; font-weight: 700; color: var(--slate-800); margin: 0;">Select Eligible Children</h3>
                         </div>
                         <div style="display:flex;gap:12px;">
-                            <button type="button" id="selectAllBtn" style="font-size:12px;color:var(--green);background:var(--green-light);border:1px solid var(--green-border);padding: 4px 12px; border-radius: 6px; cursor:pointer;font-weight:600;">Select All Visible</button>
-                            <button type="button" id="clearAllBtn" style="font-size:12px;color:var(--slate-500);background:var(--slate-100);border:1px solid var(--slate-200);padding: 4px 12px; border-radius: 6px; cursor:pointer;font-weight:600;">Clear All</button>
+                            <button type="button" id="selectAllBtn" style="font-size:12px;color:var(--green);background:var(--green-light);border:1px solid var(--green-border);padding: 4px 12px; border-radius: 6px; cursor:pointer;font-weight:600;">Select All Children</button>
+                            <button type="button" id="clearAllBtn" style="font-size:12px;color:var(--slate-500);background:var(--slate-100);border:1px solid var(--slate-200);padding: 4px 12px; border-radius: 6px; cursor:pointer;font-weight:600;">Clear </button>
                         </div>
                     </div>
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">

@@ -378,7 +378,7 @@ function determineWeightForAgeStatus(float $weightKg, array $ref): ?string
  */
 function determineMuacStatus(float $muacCm): ?string
 {
-    if ($muacCm < 0) {
+    if ($muacCm <= 0) {
         return null;
     }
     

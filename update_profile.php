@@ -160,10 +160,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $measurement_date = (new DateTime('today'))->format('Y-m-d');
         }
 
-        // Enforce that measurement date is today's server date
+        // Enforce that measurement date is not in the future
         $todayServer = (new DateTime('today'))->format('Y-m-d');
-        if ($measurement_date !== $todayServer) {
-            echo json_encode(['success' => false, 'message' => 'Measurement date must be today (server date).']);
+        if ($measurement_date > $todayServer) {
+            echo json_encode(['success' => false, 'message' => 'Measurement date cannot be in the future.']);
             exit;
         }
 
@@ -212,9 +212,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $age_in_months = ($diff->y * 12) + $diff->m;
         if ($age_in_months < 0) $age_in_months = 0;
 
+        if ($age_in_months > 59) {
+            echo json_encode(['success' => false, 'message' => 'The child\'s age at measurement must not exceed 4 years and 11 months (59 months).']);
+            exit;
+        }
+
         // MUAC is only valid for children 6 months and older
         if ($age_in_months < 6) {
             $muac = 0;
+        } else {
+            if ($update_mode === 'muac') {
+                if (!isset($_POST['muac_measurement']) || $_POST['muac_measurement'] === '' || floatval($_POST['muac_measurement']) <= 0) {
+                    echo json_encode(['success' => false, 'message' => 'MUAC measurement must be greater than zero.']);
+                    exit;
+                }
+            } else {
+                if (isset($_POST['muac_measurement']) && $_POST['muac_measurement'] !== '') {
+                    if (floatval($_POST['muac_measurement']) <= 0) {
+                        echo json_encode(['success' => false, 'message' => 'MUAC measurement must be greater than zero.']);
+                        exit;
+                    }
+                }
+            }
         }
 
 
@@ -277,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        $is_muac_only = ($update_mode === 'muac') ? 1 : 0;
+
 
         // Insert or Update logic
         if ($update_mode === 'muac') {
@@ -295,12 +314,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $growthStmt->close();
                 }
             } else {
-                // Second MUAC update: insert as a new record inheriting height and weight
-                $growthSql = "INSERT INTO growth_records (child_id, measurement_date, weight, height, muac_measurement, weight_id, height_id, wfl_id, muac_id, recorded_by, is_muac_only)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                // Second+ MUAC update: insert a new MUAC-only record (height/weight stored as 0).
+                // Storing 0 for height/weight lets us distinguish MUAC-only rows from full
+                // measurements via (height > 0 AND weight > 0) without a dedicated flag column.
+                $muacOnlyWeight = 0;
+                $muacOnlyHeight = 0;
+                $growthSql = "INSERT INTO growth_records (child_id, measurement_date, weight, height, muac_measurement, muac_id, recorded_by)
+                              VALUES (?, ?, ?, ?, ?, ?, ?)";
                 $growthStmt = $conn->prepare($growthSql);
                 if ($growthStmt) {
-                    $growthStmt->bind_param('isdddiiiiii', $child_id, $measurement_date, $weight, $height, $muac, $weight_id, $height_id, $wfl_id, $muac_id, $sessionUserId, $is_muac_only);
+                    $growthStmt->bind_param('isdddii', $child_id, $measurement_date, $muacOnlyWeight, $muacOnlyHeight, $muac, $muac_id, $sessionUserId);
                     if ($growthStmt->execute()) {
                         $measurementRecorded = true;
                     }
@@ -309,11 +332,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } else {
             // Insert new record (Standard Measurement or 'both')
-            $growthSql = "INSERT INTO growth_records (child_id, measurement_date, weight, height, muac_measurement, weight_id, height_id, wfl_id, muac_id, recorded_by, is_muac_only)
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $growthSql = "INSERT INTO growth_records (child_id, measurement_date, weight, height, muac_measurement, weight_id, height_id, wfl_id, muac_id, recorded_by)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $growthStmt = $conn->prepare($growthSql);
             if ($growthStmt) {
-                $growthStmt->bind_param('isdddiiiiii', $child_id, $measurement_date, $weight, $height, $muac, $weight_id, $height_id, $wfl_id, $muac_id, $sessionUserId, $is_muac_only);
+                $growthStmt->bind_param('isdddiiiii', $child_id, $measurement_date, $weight, $height, $muac, $weight_id, $height_id, $wfl_id, $muac_id, $sessionUserId);
                 if ($growthStmt->execute()) {
                     $measurementRecorded = true;
                 }

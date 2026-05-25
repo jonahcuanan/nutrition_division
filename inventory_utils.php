@@ -38,9 +38,9 @@ function inventory_status_from_expiration(?string $expirationDate, ?DateTime $to
 /** Keep DB status column aligned with expiration_date when the column exists. */
 function sync_inventory_statuses(mysqli $conn): void
 {
-    // Clear expiration date and status for zero stock items
+    // Clear expiration date and set status to Out of Stock for zero stock items
     if (inventory_status_column_exists($conn)) {
-        $conn->query("UPDATE inventory SET expiration_date = NULL, status = 'Available' WHERE quantity = 0");
+        $conn->query("UPDATE inventory SET expiration_date = NULL, status = 'Out of Stock' WHERE quantity = 0");
     } else {
         $conn->query("UPDATE inventory SET expiration_date = NULL WHERE quantity = 0");
     }
@@ -50,19 +50,24 @@ function sync_inventory_statuses(mysqli $conn): void
     }
     $conn->query(
         "UPDATE inventory SET status = 'Expired'
-         WHERE expiration_date IS NOT NULL AND expiration_date < CURDATE()"
+         WHERE quantity > 0 AND expiration_date IS NOT NULL AND expiration_date < CURDATE()"
     );
     $conn->query(
         "UPDATE inventory SET status = 'Available'
-         WHERE expiration_date IS NULL OR expiration_date >= CURDATE()"
+         WHERE quantity > 0 AND (expiration_date IS NULL OR expiration_date >= CURDATE())"
     );
 }
 
 function enrich_inventory_status(array $row, ?DateTime $today = null): array
 {
     $today = $today ?? new DateTime('today');
+    $qty = isset($row['quantity']) ? (int)$row['quantity'] : 1;
+    if ($qty <= 0) {
+        $row['status'] = 'Out of Stock';
+        return $row;
+    }
     $status = trim((string)($row['status'] ?? ''));
-    if ($status === 'Available' || $status === 'Expired') {
+    if ($status === 'Available' || $status === 'Expired' || $status === 'Out of Stock') {
         $row['status'] = $status;
         return $row;
     }

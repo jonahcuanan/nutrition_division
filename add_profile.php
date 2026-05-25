@@ -163,6 +163,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($age_in_months < 0) {
                 $age_in_months = 0;
             }
+            if ($age_in_months > 59) {
+                $errorMessage = 'The child\'s age must not exceed 4 years and 11 months (59 months).';
+            }
         }
 
         // Validate height/weight/muac for initial measurement
@@ -184,8 +187,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($height <= 0 || $weight <= 0) {
                 $errorMessage = 'Height and weight must be greater than zero.';
             }
-            if ($muac_measurement !== null && $muac_measurement < 0) {
-                $errorMessage = 'MUAC measurement cannot be negative.';
+            if ($muac_measurement !== null && $muac_measurement <= 0) {
+                $errorMessage = 'MUAC measurement must be greater than zero.';
             }
         }
 
@@ -631,18 +634,18 @@ if ($gResult) while ($g = $gResult->fetch_assoc()) $guardians[] = $g;
                             <span class="text-[0.68rem] text-slate-400">Used to compute age at measurement</span>
                         </div>
                         <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Initial Height (cm) <span class="text-rose-500">*</span></label>
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Height (cm) <span class="text-rose-500">*</span></label>
                             <input type="number" name="height" id="heightField" step="0.1" min="0" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
                             <span class="text-[0.68rem] text-slate-400">Current measured height in centimeters</span>
                         </div>
                         <div class="flex flex-col gap-1.5">
-                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Initial Weight (kg) <span class="text-rose-500">*</span></label>
+                            <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">Weight (kg) <span class="text-rose-500">*</span></label>
                             <input type="number" name="weight" id="weightField" step="0.1" min="0" required class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
                             <span class="text-[0.68rem] text-slate-400">Current measured weight in kilograms</span>
                         </div>
                         <div id="muacContainer" class="flex flex-col gap-1.5">
                             <label class="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-slate-700">MUAC Measurement (cm)</label>
-                            <input type="number" name="muac_measurement" id="muacField" step="0.1" min="0" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
+                            <input type="number" name="muac_measurement" id="muacField" step="0.1" min="0.1" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-[0.8rem] text-slate-900 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
                             <span class="text-[0.68rem] text-slate-400">Mid-Upper Arm Circumference</span>
                         </div>
                     </div>

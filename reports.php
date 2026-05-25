@@ -1318,6 +1318,12 @@ function getAgeGroup($ageMonths, $ageGroups) {
                                     <tbody>
                                         <?php 
                                         $affectedChildren = $reportData['affectedChildren'] ?? [];
+                                        // Sort alphabetically by last name
+                                        usort($affectedChildren, function($a, $b) {
+                                            $lastA = strtolower(trim(explode(',', $a['child_name'])[0]));
+                                            $lastB = strtolower(trim(explode(',', $b['child_name'])[0]));
+                                            return strcmp($lastA, $lastB);
+                                        });
                                         $childrenCount = count($affectedChildren);
                                         
                                         foreach ($affectedChildren as $idx => $child): 

@@ -258,22 +258,22 @@ if (isset($conn) && $conn instanceof mysqli && $conn->connect_errno === 0) {
     if ($roleRaw === 'Health Worker' && $userBarangayId > 0) {
         // Health Worker scope: all children in their barangay
         if ($cutoffRecordId > 0) {
-            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE gr.record_id > $cutoffRecordId AND c.barangay_id = $userBarangayId AND gr.is_muac_only = 0 AND c.status = 'Active'";
+            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE gr.record_id > $cutoffRecordId AND c.barangay_id = $userBarangayId AND (gr.weight > 0 AND gr.height > 0) AND c.status = 'Active'";
         } else {
             $mtp_sql = "SELECT COUNT(DISTINCT child_id) FROM children WHERE barangay_id = $userBarangayId AND status = 'Active'";
         }
     } elseif ($isBnsDash && $currentUserIdDash > 0) {
         // Recorded by scope: only children the user added
         if ($cutoffRecordId > 0) {
-            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE gr.record_id > $cutoffRecordId AND gr.recorded_by = $currentUserIdDash AND gr.is_muac_only = 0 AND c.status = 'Active'";
+            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE gr.record_id > $cutoffRecordId AND gr.recorded_by = $currentUserIdDash AND (gr.weight > 0 AND gr.height > 0) AND c.status = 'Active'";
         } else {
-            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE gr.recorded_by = $currentUserIdDash AND gr.is_muac_only = 0 AND c.status = 'Active'";
+            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE gr.recorded_by = $currentUserIdDash AND (gr.weight > 0 AND gr.height > 0) AND c.status = 'Active'";
         }
     } else {
         if ($cutoffRecordId > 0) {
-            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE gr.record_id > $cutoffRecordId AND gr.is_muac_only = 0 AND c.status = 'Active'";
+            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE gr.record_id > $cutoffRecordId AND (gr.weight > 0 AND gr.height > 0) AND c.status = 'Active'";
         } else {
-            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE gr.is_muac_only = 0 AND c.status = 'Active'";
+            $mtp_sql = "SELECT COUNT(DISTINCT gr.child_id) FROM growth_records gr JOIN children c ON gr.child_id = c.child_id WHERE (gr.weight > 0 AND gr.height > 0) AND c.status = 'Active'";
         }
     }
     if ($mtp_res = $conn->query($mtp_sql)) {

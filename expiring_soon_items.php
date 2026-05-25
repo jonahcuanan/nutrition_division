@@ -17,6 +17,7 @@ $editErrors = [];
 $editItemId = '';
 $editExpirationDate = '';
 $editItemName = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_item') {
     $editItemId = trim($_POST['item_id'] ?? '');
     $editExpirationDate = trim($_POST['expiration_date'] ?? '');
@@ -74,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_
                         'inventory_edit_item',
                         'Updated expiration for: ' . $editItemName . ' | Expiry: ' . ($editExpirationDate !== '' ? $editExpirationDate : 'No expiry') . ' | Status: ' . $newStatus
                     );
-                    header('Location: inventory_items.php' . (!empty($_GET) ? '?' . http_build_query($_GET) : ''));
+                    header('Location: expiring_soon_items.php');
                     exit;
                 }
                 $editErrors[] = 'Failed to update item. Please try again.';
@@ -124,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
                         'inventory_delete_item',
                         'Deleted inventory item: ' . $itemName
                     );
-                    header('Location: inventory_items.php' . (!empty($_GET) ? '?' . http_build_query($_GET) : ''));
+                    header('Location: expiring_soon_items.php');
                     exit;
                 }
                 $deleteErrors[] = 'Failed to delete item. Please try again.';
@@ -140,79 +141,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
     }
 }
 
-if (isset($_GET['restocked']) && $_GET['restocked'] == '1') {
-    $successMessage = 'Stock updated! The item quantity has been successfully restocked.';
-} elseif (isset($_GET['item_removed']) && $_GET['item_removed'] == '1') {
-    $successMessage = 'Expired item removed from inventory.';
-} elseif (isset($_GET['stock_zeroed']) && $_GET['stock_zeroed'] == '1') {
-    $successMessage = 'Stock set to zero. This expired item can no longer be used in interventions.';
-}
-
-$categoryId = null;
 $restockErrors = [];
 $restockItemId = '';
 $restockQty = '1';
-$restockRemarks = '';
-
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'zero_expired_stock') {
-    $zeroItemId = trim($_POST['item_id'] ?? '');
-    $zeroErrors = [];
-
-    if ($zeroItemId === '' || !ctype_digit($zeroItemId)) {
-        $zeroErrors[] = 'Invalid item selected.';
-    }
-
-    if (empty($zeroErrors)) {
-        $itemId = (int)$zeroItemId;
-        $itemRow = fetch_inventory_item_for_action($conn, $itemId);
-
-        if (!$itemRow) {
-            $zeroErrors[] = 'Item not found.';
-        } elseif (($itemRow['status'] ?? '') !== 'Expired') {
-            $zeroErrors[] = 'Only expired items can have stock cleared this way.';
-        } elseif ((int)($itemRow['quantity'] ?? 0) <= 0) {
-            $zeroErrors[] = 'Stock is already zero.';
-        }
-
-        if (empty($zeroErrors)) {
-            $itemName = (string)($itemRow['item_name'] ?? 'Item');
-            $zeroStmt = $conn->prepare('UPDATE inventory SET quantity = 0, last_updated = NOW() WHERE inventory_id = ? AND quantity > 0');
-            if ($zeroStmt) {
-                $zeroStmt->bind_param('i', $itemId);
-                if ($zeroStmt->execute() && $zeroStmt->affected_rows > 0) {
-                    $zeroStmt->close();
-                    sync_inventory_statuses($conn);
-                    log_user_activity(
-                        $conn,
-                        (int)($_SESSION['user_id'] ?? 0),
-                        'inventory_zero_expired_stock',
-                        'Set stock to zero (expired): ' . $itemName
-                    );
-                    $redirectParams = $_GET;
-                    unset($redirectParams['stock_zeroed']);
-                    $redirectParams['stock_zeroed'] = '1';
-                    $baseUrl = strtok($_SERVER['REQUEST_URI'], '?');
-                    header('Location: ' . $baseUrl . '?' . http_build_query($redirectParams));
-                    exit;
-                }
-                $zeroErrors[] = 'Failed to update stock. Please try again.';
-                $zeroStmt->close();
-            } else {
-                $zeroErrors[] = 'Database error updating stock.';
-            }
-        }
-    }
-
-    if (!empty($zeroErrors)) {
-        $errorMessage = $zeroErrors[0];
-    }
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'restock_item') {
     $restockItemId = trim($_POST['item_id'] ?? '');
     $restockQty = trim($_POST['restock_qty'] ?? '1');
-    $restockRemarks = trim($_POST['restock_remarks'] ?? '');
 
     if ($restockItemId === '' || !ctype_digit($restockItemId)) {
         $restockErrors[] = 'Invalid item selected.';
@@ -270,11 +204,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resto
                 $stmt->bind_param('ii', $qtyVal, $itemId);
                 if ($stmt->execute()) {
                     $stmt->close();
-                    $redirectParams = $_GET;
-                    $redirectParams['restocked'] = 1;
-                    $baseUrl = strtok($_SERVER['REQUEST_URI'], '?');
-                    $redirectUrl = $baseUrl . (!empty($redirectParams) ? ('?' . http_build_query($redirectParams)) : '');
-                    header('Location: ' . $redirectUrl);
+                    log_user_activity(
+                        $conn,
+                        (int)($_SESSION['user_id'] ?? 0),
+                        'inventory_restock',
+                        'Restocked item: ' . $itemName . ' | Added: ' . $qtyVal
+                    );
+                    header('Location: expiring_soon_items.php?restocked=1');
                     exit;
                 }
                 $restockErrors[] = 'Failed to restock item. Please try again.';
@@ -284,85 +220,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'resto
             }
         }
     }
-}
-$isUncategorized = false;
-$categoryLabel = 'All Categories';
 
-if (isset($_GET['category_id']) && ctype_digit((string)$_GET['category_id'])) {
-    $categoryId = (int)$_GET['category_id'];
-    $stmt = $conn->prepare('SELECT category_name FROM category_inventory WHERE category_id = ?');
-    if ($stmt) {
-        $stmt->bind_param('i', $categoryId);
-        $stmt->execute();
-        $stmt->bind_result($catName);
-        if ($stmt->fetch()) {
-            $categoryLabel = $catName ?: $categoryLabel;
-        } else {
-            $categoryLabel = 'Unknown Category';
-        }
-        $stmt->close();
-    }
-} elseif (isset($_GET['category']) && $_GET['category'] === 'uncategorized') {
-    $isUncategorized = true;
-    $categoryLabel = 'Uncategorized';
-}
-
-$categories = [];
-$catResult = $conn->query("SELECT c.category_id, c.category_name, COUNT(i.inventory_id) AS item_count FROM category_inventory c LEFT JOIN inventory i ON i.category_id = c.category_id GROUP BY c.category_id, c.category_name ORDER BY c.category_name");
-if ($catResult && $catResult->num_rows > 0) {
-    while ($row = $catResult->fetch_assoc()) {
-        $categories[] = $row;
+    if (!empty($restockErrors)) {
+        $errorMessage = $restockErrors[0];
     }
 }
 
-$hasUncategorized = false;
-$inventoryItems = [];
+if (isset($_GET['restocked']) && $_GET['restocked'] == '1') {
+    $successMessage = 'Stock updated! The item quantity has been successfully restocked.';
+}
+
 $today = new DateTime('today');
 sync_inventory_statuses($conn);
 $invSelect = inventory_select_columns();
 
-if ($categoryId !== null) {
-    $stmt = $conn->prepare("SELECT {$invSelect} FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id WHERE i.category_id = ? ORDER BY i.item_name");
-    if ($stmt) {
-        $stmt->bind_param('i', $categoryId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        while ($row = $result->fetch_assoc()) {
-            $row = enrich_inventory_status($row, $today);
-            $categoryLabelRow = $row['category_name'] ?: 'Uncategorized';
-            if ($row['category_name'] === null || $row['category_name'] === '') {
-                $hasUncategorized = true;
-            }
-            $row['category_label'] = $categoryLabelRow;
-            $row['category_key'] = strtolower($categoryLabelRow);
-            $inventoryItems[] = $row;
-        }
-        $stmt->close();
-    }
-} elseif ($isUncategorized) {
-    $invResult = $conn->query("SELECT {$invSelect} FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id WHERE i.category_id IS NULL OR i.category_id = 0 ORDER BY i.item_name");
-    if ($invResult && $invResult->num_rows > 0) {
-        while ($row = $invResult->fetch_assoc()) {
-            $row = enrich_inventory_status($row, $today);
-            $row['category_label'] = 'Uncategorized';
-            $row['category_key'] = 'uncategorized';
-            $inventoryItems[] = $row;
-        }
-    }
-    $hasUncategorized = true;
-} else {
-    $invResult = $conn->query("SELECT {$invSelect} FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id ORDER BY i.item_name");
-    if ($invResult && $invResult->num_rows > 0) {
-        while ($row = $invResult->fetch_assoc()) {
-            $row = enrich_inventory_status($row, $today);
-            $categoryLabelRow = $row['category_name'] ?: 'Uncategorized';
-            if ($row['category_name'] === null || $row['category_name'] === '') {
-                $hasUncategorized = true;
-            }
-            $row['category_label'] = $categoryLabelRow;
-            $row['category_key'] = strtolower($categoryLabelRow);
-            $inventoryItems[] = $row;
-        }
+// Query items expiring within the next 30 days (and not expired yet, and quantity > 0)
+$invResult = $conn->query("SELECT {$invSelect} FROM inventory i LEFT JOIN category_inventory c ON i.category_id = c.category_id WHERE i.quantity > 0 AND i.expiration_date IS NOT NULL AND i.expiration_date >= CURDATE() AND i.expiration_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) ORDER BY i.item_name");
+
+$inventoryItems = [];
+if ($invResult && $invResult->num_rows > 0) {
+    while ($row = $invResult->fetch_assoc()) {
+        $row = enrich_inventory_status($row, $today);
+        $categoryLabelRow = $row['category_name'] ?: 'Uncategorized';
+        $row['category_label'] = $categoryLabelRow;
+        $row['category_key'] = strtolower($categoryLabelRow);
+        $inventoryItems[] = $row;
     }
 }
 
@@ -377,14 +259,20 @@ foreach ($inventoryItems as $item) {
     if ($qty > $maxQty) $maxQty = $qty;
 }
 
-$lockCategoryFilter = $categoryId !== null || $isUncategorized;
+$categories = [];
+$catResult = $conn->query("SELECT category_id, category_name FROM category_inventory ORDER BY category_name");
+if ($catResult && $catResult->num_rows > 0) {
+    while ($row = $catResult->fetch_assoc()) {
+        $categories[] = $row;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Current Stock</title>
+    <title>Expiring Soon Items</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/inventory.css">
     <style>
@@ -446,7 +334,6 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                 opacity: 0;
                 transform: translateY(-6px);
             }
-
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -459,13 +346,10 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
 
 <main class="main-content">
     <div class="page-header">
-        <div class="page-header-icon">📦</div>
+        <div class="page-header-icon">📅</div>
         <div class="page-header-text">
-            <h1>Current Stock</h1>
-            <div style="margin-top: 6px;">
-                <span style="font-size: 0.75rem; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Filtering by:</span>
-                <span class="badge badge-blue" style="font-size: 0.85rem; padding: 4px 12px; margin-left: 4px; border-width: 1.5px;"><?= htmlspecialchars($categoryLabel) ?></span>
-            </div>
+            <h1>Expiring Soon Items Overview</h1>
+            <p>Monitor and manage items that expire within the next 30 days</p>
         </div>
         <div class="page-header-actions">
             <a class="btn btn-outline" href="inventory.php">← Back to Inventory</a>
@@ -476,15 +360,6 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
          data-success="<?= htmlspecialchars($successMessage ?? '', ENT_QUOTES) ?>"
          data-error="<?= htmlspecialchars($errorMessage ?? '', ENT_QUOTES) ?>"></div>
 
-    <?php if (isset($_GET['restocked']) && $_GET['restocked'] == '1'): ?>
-    <div class="alert alert-success">
-        <span class="alert-icon">✅</span>
-        <div class="alert-body">
-            <strong>Stock updated!</strong>
-            <span>The item quantity has been restocked.</span>
-        </div>
-    </div>
-    <?php endif; ?>
     <?php if ($errorMessage !== ''): ?>
     <div class="alert alert-error" style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;padding:12px 16px;border-radius:8px;margin-bottom:16px;">
         <strong>Could not complete action:</strong> <?= htmlspecialchars($errorMessage) ?>
@@ -496,8 +371,8 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             <div class="card-header-left">
                 <div class="card-header-icon icon-green">📋</div>
                 <div>
-                    <h2>Stock Items</h2>
-                    <p>View the current inventory for this category</p>
+                    <h2>Expiring Soon Items</h2>
+                    <p>Displaying inventory items expiring within 30 days</p>
                 </div>
             </div>
         </div>
@@ -506,27 +381,12 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input type="text" id="invSearch" placeholder="Search by item name…">
             </div>
-            <!-- Category filter removed as per user request -->
-            <select class="filter-select" id="stockFilter">
-                <option value="">Show All Stock Levels</option>
-                <option value="low">⚠️ Low Stock (5 or fewer left)</option>
-                <option value="ok">✅ Sufficient Stock (More than 5 left)</option>
-            </select>
-            <select class="filter-select" id="expirationFilter">
-                <option value="">Show All Expiration Statuses</option>
-                <option value="expired">🔴 Already Expired</option>
-                <option value="soon">🟠 Expiring Soon (Within 30 days)</option>
-                <option value="good">🟢 Good (Not Expired / No Expiry)</option>
-            </select>
-            <select class="filter-select" id="availabilityFilter">
-                <option value="">Show All Stock Availability</option>
-                <option value="in">📦 In Stock (Available)</option>
-                <option value="out">❌ Out of Stock (Empty)</option>
-            </select>
-            <select class="filter-select" id="itemStatusFilter">
-                <option value="">Show All Item Status</option>
-                <option value="available">🟢 Available</option>
-                <option value="expired">🔴 Expired</option>
+            <select class="filter-select" id="categoryFilter">
+                <option value="">All Categories</option>
+                <?php foreach ($categories as $cat): ?>
+                    <option value="<?= htmlspecialchars($cat['category_name']) ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                <?php endforeach; ?>
+                <option value="Uncategorized">Uncategorized</option>
             </select>
             <span class="row-count" id="invCount"><?= $totalItems ?> item<?= $totalItems !== 1 ? 's' : '' ?></span>
         </div>
@@ -535,6 +395,7 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             <thead>
                 <tr>
                     <th>Item Name</th>
+                    <th>Category</th>
                     <th class="center">Stock Level</th>
                     <th class="hide-mobile">Expiration Date</th>
                     <th class="center">Status</th>
@@ -546,10 +407,9 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             <?php if (!empty($inventoryItems)):
                 foreach ($inventoryItems as $row):
                     $qty = (int)$row['quantity'];
-                    $barPct = $maxQty > 0 ? min(100, round(($qty / $maxQty) * 100)) : 0;
-                    if ($qty === 0)     { $qtyClass = 'qty-empty'; $barClass = 'bar-red'; $availability = 'out'; }
-                    elseif ($qty <= 5) { $qtyClass = 'qty-warn';  $barClass = 'bar-amber'; $availability = 'in'; }
-                    else               { $qtyClass = 'qty-ok';    $barClass = 'bar-green'; $availability = 'in'; }
+                    if ($qty === 0)     { $qtyClass = 'qty-empty'; $availability = 'out'; }
+                    elseif ($qty <= 5) { $qtyClass = 'qty-warn';  $availability = 'in'; }
+                    else               { $qtyClass = 'qty-ok';    $availability = 'in'; }
 
                     $expDate = '—'; $expClass = 'exp-none'; $expExtra = ''; $expirationStatus = 'good';
                     if ($row['expiration_date']) {
@@ -576,6 +436,7 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                     $itemStatus = (string)($row['status'] ?? 'Available');
                     $isExpired = $itemStatus === 'Expired';
                     $isOutOfStock = $itemStatus === 'Out of Stock';
+                    
                     if ($isExpired) {
                         $statusBadgeClass = 'badge-red';
                     } elseif ($isOutOfStock) {
@@ -589,6 +450,7 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             <tr class="inv-stock-row <?= $isExpired ? 'inv-stock-row--expired' : 'inv-stock-row--available' ?>"
                 id="item-row-<?= $inventoryId ?>"
                 data-search="<?= strtolower(htmlspecialchars($row['item_name'])) ?>" 
+                data-category="<?= htmlspecialchars($row['category_label']) ?>"
                 data-stock="<?= $qty<=5?'low':'ok' ?>"
                 data-expiration="<?= $expirationStatus ?>"
                 data-availability="<?= $availability ?>"
@@ -596,6 +458,9 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                 <td class="item-name-cell inv-non-clickable" data-label="Item">
                     <strong><?= htmlspecialchars($row['item_name']) ?></strong>
                     <?= $qty===0 ? '<span>Out of stock</span>' : '' ?>
+                </td>
+                <td class="inv-non-clickable" data-label="Category" style="font-weight:500;color:#374151;">
+                    <?= htmlspecialchars($row['category_label']) ?>
                 </td>
                 <td class="qty-cell" data-label="Stock">
                     <span class="qty-number <?= $qtyClass ?>"><?= $qty ?></span>
@@ -625,35 +490,19 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                         </button>
 
                         <?php if ($isExpired): ?>
-                            <?php if ($qty > 0): ?>
-                            <form method="post" class="js-zero-expired-form" style="display:inline-flex;margin:0;">
-                                <input type="hidden" name="action" value="zero_expired_stock">
-                                <input type="hidden" name="item_id" value="<?= $inventoryId ?>">
-                                <button
-                                    type="button"
-                                    class="btn btn-zero-expired-stock js-open-zero-expired-modal"
-                                    data-item-name="<?= htmlspecialchars($row['item_name'], ENT_QUOTES) ?>"
-                                    title="Set stock to zero so this expired item cannot be used in new interventions"
-                                >
-                                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
-                                    Zero Stock
-                                </button>
-                            </form>
-                            <?php else: ?>
-                            <span class="inv-action-note" title="Stock cleared">Stock cleared</span>
-                            <?php endif; ?>
+                            <span class="inv-action-note" title="Expired items cannot be restocked">Expired</span>
                         <?php else: ?>
-                        <button
-                            type="button"
-                            class="btn btn-green btn-restock"
-                            data-item-id="<?= (int)$row['inventory_id'] ?>"
-                            data-item-name="<?= htmlspecialchars($row['item_name'], ENT_QUOTES) ?>"
-                            data-item-unit="<?= htmlspecialchars($row['unit'], ENT_QUOTES) ?>"
-                            data-item-qty="<?= $qty ?>"
-                        >
-                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                            Restock
-                        </button>
+                            <button
+                                type="button"
+                                class="btn btn-green btn-restock"
+                                data-item-id="<?= $inventoryId ?>"
+                                data-item-name="<?= htmlspecialchars($row['item_name'], ENT_QUOTES) ?>"
+                                data-item-unit="<?= htmlspecialchars($row['unit'], ENT_QUOTES) ?>"
+                                data-item-qty="<?= $qty ?>"
+                            >
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                                Restock
+                            </button>
                         <?php endif; ?>
 
                         <?php if (!$usedInInterventions): ?>
@@ -687,11 +536,11 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             </tr>
             <?php endforeach;
             else: ?>
-            <tr><td colspan="6" class="empty-cell">
+            <tr><td colspan="7" class="empty-cell">
                 <div class="empty-state">
-                    <div class="empty-icon">📦</div>
-                    <h3>No items found</h3>
-                    <p>No inventory items match this category.</p>
+                    <div class="empty-icon">📅</div>
+                    <h3>No expiring soon items found</h3>
+                    <p>All items have healthy expiration dates.</p>
                 </div>
             </td></tr>
             <?php endif; ?>
@@ -716,13 +565,6 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             <button type="button" class="modal-close-btn" id="restockModalClose">✕</button>
         </div>
         <div class="modal-body">
-            <?php if (!empty($restockErrors)): ?>
-            <div class="modal-alert error">
-                <strong>Please fix the following:</strong>
-                <ul><?php foreach ($restockErrors as $e): ?><li><?= htmlspecialchars($e) ?></li><?php endforeach; ?></ul>
-            </div>
-            <?php endif; ?>
-
             <form method="post" action="" id="restockForm">
                 <input type="hidden" name="action" value="restock_item">
                 <input type="hidden" name="item_id" id="restockItemId" value="<?= htmlspecialchars($restockItemId) ?>">
@@ -738,22 +580,16 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                 </div>
 
                 <div class="section-label">Restock Details</div>
-                
                 <div class="field">
                     <label>Quantity to Add <span class="req">*</span></label>
-                    <div style="position: relative;">
-                        <input type="number" name="restock_qty" id="restockQty" min="1" step="1" required value="<?= htmlspecialchars($restockQty) ?>" placeholder="Enter amount">
-                    </div>
+                    <input type="number" name="restock_qty" id="restockQty" min="1" step="1" required value="<?= htmlspecialchars($restockQty) ?>" placeholder="Enter amount">
                     <span class="field-hint">Specify the number of units to add to the existing stock.</span>
                 </div>
             </form>
         </div>
         <div class="modal-foot">
             <button type="button" class="btn btn-outline" id="restockModalCancel">Cancel</button>
-            <button type="submit" form="restockForm" class="btn btn-green">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Confirm Restock
-            </button>
+            <button type="submit" form="restockForm" class="btn btn-green">Confirm Restock</button>
         </div>
     </div>
 </div>
@@ -774,13 +610,6 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
             <button type="button" class="modal-close-btn" id="editModalClose">✕</button>
         </div>
         <div class="modal-body">
-            <?php if (!empty($editErrors)): ?>
-            <div class="modal-alert error">
-                <strong>Please fix the following:</strong>
-                <ul><?php foreach ($editErrors as $e): ?><li><?= htmlspecialchars($e) ?></li><?php endforeach; ?></ul>
-            </div>
-            <?php endif; ?>
-
             <form method="post" action="" id="editItemForm">
                 <input type="hidden" name="action" value="edit_item">
                 <input type="hidden" name="item_id" id="editItemId" value="<?= htmlspecialchars($editItemId) ?>">
@@ -799,16 +628,12 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                 <div class="field">
                     <label>Expiration Date</label>
                     <input type="date" name="expiration_date" id="editExpirationDate" value="<?= htmlspecialchars($editExpirationDate) ?>">
-                    <span class="field-hint">Leave blank if the item has no expiry date. Status will update automatically.</span>
                 </div>
             </form>
         </div>
         <div class="modal-foot">
             <button type="button" class="btn btn-outline" id="editModalCancel">Cancel</button>
-            <button type="submit" form="editItemForm" class="btn btn-blue">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                Save Changes
-            </button>
+            <button type="submit" form="editItemForm" class="btn btn-blue">Save Changes</button>
         </div>
     </div>
 </div>
@@ -822,7 +647,6 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
                 <div style="width:34px;height:34px;border-radius:10px;background:#fee2e2;display:flex;align-items:center;justify-content:center;">🗑️</div>
                 <div>
                     <div style="font-size:15px;font-weight:700;color:#0f172a;">Delete Item</div>
-                    <div style="font-size:12px;color:#64748b;">This action cannot be undone</div>
                 </div>
             </div>
             <button type="button" id="deleteItemClose" style="border:none;background:transparent;color:#64748b;cursor:pointer;font-size:16px;line-height:1;">✕</button>
@@ -835,36 +659,7 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
         </div>
         <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #e5e7eb;">
             <button type="button" id="deleteItemCancel" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">Cancel</button>
-            <button type="button" id="deleteItemConfirmBtn" class="btn-delete" style="width:auto;margin-top:0;">
-                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-                Delete
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- ══ ZERO EXPIRED STOCK MODAL ══ -->
-<div class="modal-overlay" id="zeroExpiredStockModal">
-    <div class="modal-backdrop" id="zeroExpiredStockBackdrop"></div>
-    <div class="modal-box" style="max-width:440px;border-radius:14px;overflow:hidden;">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e5e7eb;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:34px;height:34px;border-radius:10px;background:#fffbeb;display:flex;align-items:center;justify-content:center;">⚠️</div>
-                <div>
-                    <div style="font-size:15px;font-weight:700;color:#92400e;">Zero Stock Level</div>
-                </div>
-            </div>
-            <button type="button" id="zeroExpiredStockClose" style="border:none;background:transparent;color:#64748b;cursor:pointer;font-size:16px;line-height:1;">✕</button>
-        </div>
-        <div style="padding:16px;">
-            <div style="font-size:13px;color:#374151;line-height:1.6;">
-                Set stock for <strong id="zeroExpiredStockNameText"></strong> to zero?
-                <div style="margin-top:8px;font-size:12px;color:#6b7280;">The item stays in the system for past intervention records, but it will no longer appear for new give-outs.</div>
-            </div>
-        </div>
-        <div style="display:flex;justify-content:flex-end;gap:10px;padding:12px 16px;border-top:1px solid #e5e7eb;">
-            <button type="button" id="zeroExpiredStockCancel" class="btn btn-outline" style="padding:8px 14px;font-size:12px;">Cancel</button>
-            <button type="button" id="zeroExpiredStockConfirmBtn" class="btn btn-zero-expired-stock" style="width:auto;margin-top:0;padding:8px 14px;font-size:12px;">Zero Stock</button>
+            <button type="button" id="deleteItemConfirmBtn" class="btn-delete" style="width:auto;margin-top:0;">Delete</button>
         </div>
     </div>
 </div>
@@ -872,18 +667,35 @@ $lockCategoryFilter = $categoryId !== null || $isUncategorized;
 <script src="javascript/inventory.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const highlightId = urlParams.get('highlight_id');
-    if (highlightId) {
-        const row = document.getElementById('item-row-' + highlightId);
-        if (row) {
-            row.style.display = '';
-            row.classList.add('highlighted-row');
-            setTimeout(function() {
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 300);
+    const searchInput = document.getElementById('invSearch');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const rows = document.querySelectorAll('#invBody tr[data-search]');
+    const countSpan = document.getElementById('invCount');
+
+    function applyFilters() {
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+        const selectedCat = categoryFilter ? categoryFilter.value : '';
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const rowSearch = row.getAttribute('data-search') || '';
+            const rowCat = row.getAttribute('data-category') || '';
+
+            const matchSearch = !query || rowSearch.includes(query);
+            const matchCat = !selectedCat || rowCat === selectedCat;
+
+            const show = matchSearch && matchCat;
+            row.style.display = show ? '' : 'none';
+            if (show) visibleCount++;
+        });
+
+        if (countSpan) {
+            countSpan.textContent = visibleCount + ' item' + (visibleCount !== 1 ? 's' : '');
         }
     }
+
+    if (searchInput) searchInput.addEventListener('input', applyFilters);
+    if (categoryFilter) categoryFilter.addEventListener('change', applyFilters);
 });
 </script>
 </body>

@@ -143,7 +143,7 @@ if ($current_role === 'Barangay Nutrition Scholars') {
 
               <?php endif; ?>
                   <?php if (!$is_bns && !$is_hw && !$is_staff): ?>
-            <a href="inventory.php" class="<?= in_array($current_page, ['inventory.php', 'inventory_items.php'], true) ? 'active' : '' ?>">
+            <a href="inventory.php" class="<?= in_array($current_page, ['inventory.php', 'inventory_items.php', 'expired_items.php', 'low_stock_items.php', 'expiring_soon_items.php'], true) ? 'active' : '' ?>">
                 <span class="sb-icon">
                     <svg viewBox="0 0 24 24">
                         <rect x="3" y="7" width="18" height="13" rx="2"/>
